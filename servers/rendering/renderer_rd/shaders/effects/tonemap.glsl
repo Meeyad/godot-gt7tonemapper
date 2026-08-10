@@ -227,8 +227,144 @@ vec3 tonemap_agx(vec3 color) {
 	return color;
 }
 
+// ---- GT7 Tonemapper (Polyphony Digital, MIT licensed) ----
+// Reference: https://blog.selfshadow.com/publications/s2025-shading-course/pdi/supplemental/gt7_tone_mapping.cpp
+// SDR-mode only. Peak intensity fixed at 250 nits (2.5 framebuffer units), matching the
+// reference's initializeAsSDR(). All curve constants below are precomputed for this fixed
+// peak — no CPU-side setup is required.
+
+float gt7_smooth_step(float x, float edge0, float edge1) {
+	float t = clamp((x - edge0) / (edge1 - edge0), 0.0, 1.0);
+	return t * t * (3.0 - 2.0 * t);
+}
+
+float gt7_chroma_curve(float x, float a, float b) {
+	return 1.0 - gt7_smooth_step(x, a, b);
+}
+
+float gt7_evaluate_curve(float x) {
+	const float mid_point = 0.538;
+	const float linear_section = 0.444;
+	const float peak_intensity = 2.5;
+	const float toe_strength = 1.280;
+	const float kA = 2.963333333333334;
+	const float kB = -3.3733512380644313;
+	const float kC = -0.539568345323741;
+
+	if (x < 0.0) {
+		return 0.0;
+	}
+
+	float weight_linear = gt7_smooth_step(x, 0.0, mid_point);
+	float weight_toe = 1.0 - weight_linear;
+
+	if (x < linear_section * peak_intensity) {
+		float toe_mapped = mid_point * pow(x / mid_point, toe_strength);
+		return weight_toe * toe_mapped + weight_linear * x;
+	} else {
+		return kA + kB * exp(x * kC);
+	}
+}
+
+float gt7_eotf_st2084(float n) {
+	n = clamp(n, 0.0, 1.0);
+	const float m1 = 0.1593017578125;
+	const float m2 = 78.84375;
+	const float c1 = 0.8359375;
+	const float c2 = 18.8515625;
+	const float c3 = 18.6875;
+	const float pqC = 10000.0;
+
+	float np = pow(n, 1.0 / m2);
+	float l = max(np - c1, 0.0);
+	l = l / (c2 - c3 * np);
+	l = pow(l, 1.0 / m1);
+
+	return (l * pqC) / 100.0; // physicalValueToFrameBufferValue (REFERENCE_LUMINANCE = 100)
+}
+
+float gt7_inverse_eotf_st2084(float v) {
+	const float m1 = 0.1593017578125;
+	const float m2 = 78.84375;
+	const float c1 = 0.8359375;
+	const float c2 = 18.8515625;
+	const float c3 = 18.6875;
+	const float pqC = 10000.0;
+
+	float physical = v * 100.0; // frameBufferValueToPhysicalValue
+	float y = physical / pqC;
+	float ym = pow(y, m1);
+	return exp2(m2 * (log2(c1 + c2 * ym) - log2(1.0 + c3 * ym)));
+}
+
+vec3 gt7_rgb_to_ictcp(vec3 rgb) { // input: linear Rec.2020
+	float l = (rgb.r * 1688.0 + rgb.g * 2146.0 + rgb.b * 262.0) / 4096.0;
+	float m = (rgb.r * 683.0 + rgb.g * 2951.0 + rgb.b * 462.0) / 4096.0;
+	float s = (rgb.r * 99.0 + rgb.g * 309.0 + rgb.b * 3688.0) / 4096.0;
+
+	float lPQ = gt7_inverse_eotf_st2084(l);
+	float mPQ = gt7_inverse_eotf_st2084(m);
+	float sPQ = gt7_inverse_eotf_st2084(s);
+
+	return vec3(
+			(2048.0 * lPQ + 2048.0 * mPQ) / 4096.0,
+			(6610.0 * lPQ - 13613.0 * mPQ + 7003.0 * sPQ) / 4096.0,
+			(17933.0 * lPQ - 17390.0 * mPQ - 543.0 * sPQ) / 4096.0);
+}
+
+vec3 gt7_ictcp_to_rgb(vec3 ictcp) { // output: linear Rec.2020
+	float l = ictcp.x + 0.00860904 * ictcp.y + 0.11103 * ictcp.z;
+	float m = ictcp.x - 0.00860904 * ictcp.y - 0.11103 * ictcp.z;
+	float s = ictcp.x + 0.560031 * ictcp.y - 0.320627 * ictcp.z;
+
+	float lLin = gt7_eotf_st2084(l);
+	float mLin = gt7_eotf_st2084(m);
+	float sLin = gt7_eotf_st2084(s);
+
+	return vec3(
+			max(3.43661 * lLin - 2.50645 * mLin + 0.0698454 * sLin, 0.0),
+			max(-0.79133 * lLin + 1.9836 * mLin - 0.192271 * sLin, 0.0),
+			max(-0.0259499 * lLin - 0.0989137 * mLin + 1.12486 * sLin, 0.0));
+}
+
 vec3 tonemap_gt7(vec3 color) {
-	return tonemap_aces(color); // placeholder — real GT7 curve goes here later
+	// BT.709 -> BT.2020 (GT7's curve is designed for linear Rec.2020 input).
+	// Same matrix/transpose approach already validated earlier for this fork.
+	const mat3 bt2020_to_bt709 = transpose(mat3(
+			1.6605, -0.5876, -0.0728,
+			-0.1246, 1.1329, -0.0083,
+			-0.0182, -0.1006, 1.1187));
+	const mat3 bt709_to_bt2020 = inverse(bt2020_to_bt709);
+
+	const float peak_intensity = 2.5; // fixed SDR target (250 nits)
+	const float framebuffer_luminance_target_ucs = 0.6025591549907509;
+	const float blend_ratio = 0.6;
+	const float fade_start = 0.98;
+	const float fade_end = 1.16;
+	const float sdr_correction_factor = 0.4;
+
+	vec3 rgb = bt709_to_bt2020 * color;
+
+	vec3 ucs = gt7_rgb_to_ictcp(rgb);
+
+	vec3 skewed_rgb = vec3(
+			gt7_evaluate_curve(rgb.r),
+			gt7_evaluate_curve(rgb.g),
+			gt7_evaluate_curve(rgb.b));
+
+	vec3 skewed_ucs = gt7_rgb_to_ictcp(skewed_rgb);
+
+	float chroma_scale = gt7_chroma_curve(ucs.x / framebuffer_luminance_target_ucs, fade_start, fade_end);
+
+	vec3 scaled_ucs = vec3(skewed_ucs.x, ucs.y * chroma_scale, ucs.z * chroma_scale);
+	vec3 scaled_rgb = gt7_ictcp_to_rgb(scaled_ucs);
+
+	vec3 blended = mix(skewed_rgb, scaled_rgb, blend_ratio);
+	blended = min(blended, vec3(peak_intensity));
+
+	vec3 result = sdr_correction_factor * blended;
+
+	return bt2020_to_bt709 * result;
 }
 
 vec3 linear_to_srgb(vec3 color) {
