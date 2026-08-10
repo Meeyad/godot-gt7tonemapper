@@ -338,6 +338,18 @@ RendererEnvironmentStorage::TonemapParameters RendererEnvironmentStorage::enviro
 		tonemap_parameters.awp_toe_a = awp_toe_a;
 		tonemap_parameters.awp_slope = awp_slope;
 		tonemap_parameters.awp_w = awp_w;
+	} else if (env->tone_mapper == RSE::ENV_TONE_MAPPER_GT7) {
+		// Placeholder: reuse ACES math until the real GT7 curve is implemented.
+		const float exposure_bias = 1.8f;
+		const float A = 0.0245786f;
+		const float B = 0.000090537f;
+		const float C = 0.983729f;
+		const float D = 0.432951f;
+		const float E = 0.238081f;
+
+		white *= exposure_bias;
+		float white_tonemapped = (white * (white + A) - B) / (white * (C * white + D) + E);
+		tonemap_parameters.white_tonemapped = white_tonemapped;
 	}
 
 	return tonemap_parameters;

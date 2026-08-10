@@ -1,0 +1,3855 @@
+Godot Engine v4.7.2.rc.custom_build.eefdc2dbd (2026-08-07 10:01:56 UTC) - https://godotengine.org
+OpenGL API 4.1 Metal - 90.5 - Compatibility - Using Device: Apple - Apple A18 Pro
+
+Editing project: /Users/meeyad/Drive 1/Game Jam 2/GGWJam
+Godot Engine v4.7.2.rc.custom_build.eefdc2dbd (2026-08-07 10:01:56 UTC) - https://godotengine.org
+Metal 4.0 - Forward+ - Using Device #0: Apple - Apple A18 Pro (Apple9)
+ERROR: Error compiling Fragment shader.
+   at: compile_stages (servers/rendering/renderer_rd/shader_rd.cpp:1180)
+ERROR: Failed parse:
+ERROR: 0:244: 'tonemap_gt7' : no matching overloaded function found 
+ERROR: 0:244: '' : compilation terminated 
+ERROR: 2 compilation errors.  No code generated.
+
+
+
+   at: compile_stages (servers/rendering/renderer_rd/shader_rd.cpp:1181)
+ERROR: Error compiling Fragment shader.
+   at: compile_stages (servers/rendering/renderer_rd/shader_rd.cpp:1180)
+ERROR: Failed parse:
+ERROR: 0:243: 'tonemap_gt7' : no matching overloaded function found 
+ERROR: 0:243: '' : compilation terminated 
+ERROR: 2 compilation errors.  No code generated.
+
+
+
+   at: compile_stages (servers/rendering/renderer_rd/shader_rd.cpp:1181)
+ERROR: Error compiling Fragment shader.
+   at: compile_stages (servers/rendering/renderer_rd/shader_rd.cpp:1180)
+ERROR: Failed parse:
+ERROR: 0:243: 'tonemap_gt7' : no matching overloaded function found 
+ERROR: 0:243: '' : compilation terminated 
+ERROR: 2 compilation errors.  No code generated.
+
+
+
+   at: compile_stages (servers/rendering/renderer_rd/shader_rd.cpp:1181)
+ERROR: Error compiling Fragment shader.
+   at: compile_stages (servers/rendering/renderer_rd/shader_rd.cpp:1180)
+ERROR: Failed parse:
+ERROR: 0:242: 'tonemap_gt7' : no matching overloaded function found 
+ERROR: 0:242: '' : compilation terminated 
+ERROR: 2 compilation errors.  No code generated.
+
+
+
+   at: compile_stages (servers/rendering/renderer_rd/shader_rd.cpp:1181)
+ERROR: code:
+   1 | 
+   2 | #version 450
+   3 | 
+   4 | 
+   5 | 
+   6 | #define USE_1D_LUT
+   7 | 
+   8 | #define RENDER_DRIVER_METAL
+   9 | #define samplerExternalOES sampler2D
+  10 | #define textureExternalOES texture2D
+  11 | 
+  12 | #ifdef USE_MULTIVIEW
+  13 | #extension GL_EXT_multiview : enable
+  14 | #define ViewIndex gl_ViewIndex
+  15 | #endif 
+  16 | 
+  17 | layout(location = 0) in vec2 uv_interp;
+  18 | 
+  19 | #ifdef USE_MULTIVIEW
+  20 | #define SAMPLER_FORMAT sampler2DArray
+  21 | #else
+  22 | #define SAMPLER_FORMAT sampler2D
+  23 | #endif
+  24 | 
+  25 | layout(set = 0, binding = 0) uniform SAMPLER_FORMAT source_color;
+  26 | layout(set = 1, binding = 0) uniform sampler2D source_auto_exposure;
+  27 | layout(set = 2, binding = 0) uniform SAMPLER_FORMAT source_glow;
+  28 | layout(set = 2, binding = 1) uniform sampler2D glow_map; 
+  29 | 
+  30 | #ifdef USE_1D_LUT
+  31 | layout(set = 3, binding = 0) uniform sampler2D source_color_correction;
+  32 | #else
+  33 | layout(set = 3, binding = 0) uniform sampler3D source_color_correction;
+  34 | #endif
+  35 | 
+  36 | #define FLAG_USE_BCS (1 << 0)
+  37 | #define FLAG_USE_GLOW (1 << 1)
+  38 | #define FLAG_USE_AUTO_EXPOSURE (1 << 2)
+  39 | #define FLAG_USE_COLOR_CORRECTION (1 << 3)
+  40 | #define FLAG_USE_FXAA (1 << 4)
+  41 | #define FLAG_USE_8_BIT_DEBANDING (1 << 5)
+  42 | #define FLAG_CONVERT_TO_SRGB (1 << 6)
+  43 | 
+  44 | layout(push_constant, std430) uniform Params {
+  45 | 	vec3 bcs;
+  46 | 	uint flags;
+  47 | 
+  48 | 	vec2 pixel_size;
+  49 | 	uint tonemapper;
+  50 | 	float output_max_value;
+  51 | 
+  52 | 	uvec2 glow_texture_size;
+  53 | 	float glow_intensity;
+  54 | 	float glow_map_strength;
+  55 | 
+  56 | 	uint glow_mode;
+  57 | 	float glow_levels[7];
+  58 | 
+  59 | 	float exposure;
+  60 | 	float white;
+  61 | 	float auto_exposure_scale;
+  62 | 	float luminance_multiplier;
+  63 | 
+  64 | 	vec4 tonemapper_params;
+  65 | }
+  66 | params;
+  67 | 
+  68 | layout(location = 0) out vec4 frag_color;
+  69 | 
+  70 | 
+  71 | vec3 tonemap_reinhard(vec3 color) {
+  72 | 	float white_squared = params.tonemapper_params.x;
+  73 | 	
+  74 | 	return color * (1.0f + color / white_squared) / (1.0f + color / params.output_max_value);
+  75 | }
+  76 | 
+  77 | vec3 tonemap_filmic(vec3 color) {
+  78 | 	
+  79 | 	
+  80 | 	
+  81 | 	
+  82 | 	const float exposure_bias = 2.0f;
+  83 | 	const float A = 0.22f * exposure_bias * exposure_bias; 
+  84 | 	const float B = 0.30f * exposure_bias;
+  85 | 	const float C = 0.10f;
+  86 | 	const float D = 0.20f;
+  87 | 	const float E = 0.01f;
+  88 | 	const float F = 0.30f;
+  89 | 
+  90 | 	vec3 color_tonemapped = ((color * (A * color + C * B) + D * E) / (color * (A * color + B) + D * F)) - E / F;
+  91 | 
+  92 | 	return color_tonemapped / params.tonemapper_params.x;
+  93 | }
+  94 | 
+  95 | 
+  96 | 
+  97 | vec3 tonemap_aces(vec3 color) {
+  98 | 	
+  99 | 	const float exposure_bias = 1.8f;
+ 100 | 	const float A = 0.0245786f;
+ 101 | 	const float B = 0.000090537f;
+ 102 | 	const float C = 0.983729f;
+ 103 | 	const float D = 0.432951f;
+ 104 | 	const float E = 0.238081f;
+ 105 | 
+ 106 | 	
+ 107 | 	const mat3 rgb_to_rrt = mat3(
+ 108 | 			vec3(0.59719f * exposure_bias, 0.35458f * exposure_bias, 0.04823f * exposure_bias),
+ 109 | 			vec3(0.07600f * exposure_bias, 0.90834f * exposure_bias, 0.01566f * exposure_bias),
+ 110 | 			vec3(0.02840f * exposure_bias, 0.13383f * exposure_bias, 0.83777f * exposure_bias));
+ 111 | 
+ 112 | 	const mat3 odt_to_rgb = mat3(
+ 113 | 			vec3(1.60475f, -0.53108f, -0.07367f),
+ 114 | 			vec3(-0.10208f, 1.10813f, -0.00605f),
+ 115 | 			vec3(-0.00327f, -0.07276f, 1.07602f));
+ 116 | 
+ 117 | 	color *= rgb_to_rrt;
+ 118 | 	vec3 color_tonemapped = (color * (color + A) - B) / (color * (C * color + D) + E);
+ 119 | 	color_tonemapped *= odt_to_rgb;
+ 120 | 
+ 121 | 	return color_tonemapped / params.tonemapper_params.x;
+ 122 | }
+ 123 | 
+ 124 | 
+ 125 | 
+ 126 | 
+ 127 | vec3 allenwp_curve(vec3 x) {
+ 128 | 	
+ 129 | 	
+ 130 | 	const float awp_crossover_point = 0.18;
+ 131 | 	
+ 132 | 	
+ 133 | 	const float awp_shoulder_max = params.output_max_value - awp_crossover_point;
+ 134 | 
+ 135 | 	float awp_contrast = params.tonemapper_params.x;
+ 136 | 	float awp_toe_a = params.tonemapper_params.y;
+ 137 | 	float awp_slope = params.tonemapper_params.z;
+ 138 | 	float awp_w = params.tonemapper_params.w;
+ 139 | 
+ 140 | 	
+ 141 | 	vec3 s = x - awp_crossover_point;
+ 142 | 	vec3 slope_s = awp_slope * s;
+ 143 | 	s = slope_s * (1.0 + s / awp_w) / (1.0 + (slope_s / awp_shoulder_max));
+ 144 | 	s += awp_crossover_point;
+ 145 | 
+ 146 | 	
+ 147 | 	vec3 t = pow(x, vec3(awp_contrast));
+ 148 | 	t = t / (t + awp_toe_a);
+ 149 | 
+ 150 | 	return mix(s, t, lessThan(x, vec3(awp_crossover_point)));
+ 151 | }
+ 152 | 
+ 153 | 
+ 154 | 
+ 155 | 
+ 156 | 
+ 157 | vec3 tonemap_agx(vec3 color) {
+ 158 | 	
+ 159 | 	
+ 160 | 	
+ 161 | 	
+ 162 | 	
+ 163 | 	
+ 164 | 	
+ 165 | 	
+ 166 | 	
+ 167 | 	
+ 168 | 	
+ 169 | 	
+ 170 | 	
+ 171 | 	
+ 172 | 	
+ 173 | 	
+ 174 | 	
+ 175 | 
+ 176 | 	
+ 177 | 	const mat3 rec709_to_rec2020_agx_inset_matrix = mat3(
+ 178 | 			0.544814746488245, 0.140416948464053, 0.0888104196149096,
+ 179 | 			0.373787398372697, 0.754137554567394, 0.178871756420858,
+ 180 | 			0.0813978551390581, 0.105445496968552, 0.732317823964232);
+ 181 | 
+ 182 | 	
+ 183 | 	const mat3 agx_outset_rec2020_to_rec709_matrix = mat3(
+ 184 | 			1.96488741169489, -0.299313364904742, -0.164352742528393,
+ 185 | 			-0.855988495690215, 1.32639796461980, -0.238183969428088,
+ 186 | 			-0.108898916004672, -0.0270845997150571, 1.40253671195648);
+ 187 | 
+ 188 | 	
+ 189 | 	color = rec709_to_rec2020_agx_inset_matrix * color;
+ 190 | 
+ 191 | 	
+ 192 | 	
+ 193 | 	color = allenwp_curve(color);
+ 194 | 
+ 195 | 	
+ 196 | 	
+ 197 | 	color = min(vec3(params.output_max_value), color);
+ 198 | 
+ 199 | 	
+ 200 | 	color = agx_outset_rec2020_to_rec709_matrix * color;
+ 201 | 
+ 202 | 	
+ 203 | 	
+ 204 | 	
+ 205 | 	return color;
+ 206 | }
+ 207 | 
+ 208 | vec3 linear_to_srgb(vec3 color) {
+ 209 | 	const vec3 a = vec3(0.055f);
+ 210 | 	return mix((vec3(1.0f) + a) * pow(color.rgb, vec3(1.0f / 2.4f)) - a, 12.92f * color.rgb, lessThan(color.rgb, vec3(0.0031308f)));
+ 211 | }
+ 212 | 
+ 213 | vec3 srgb_to_linear(vec3 color) {
+ 214 | 	const vec3 a = vec3(0.055f);
+ 215 | 	return mix(pow((color.rgb + a) * (1.0f / (vec3(1.0f) + a)), vec3(2.4f)), color.rgb * (1.0f / 12.92f), lessThan(color.rgb, vec3(0.04045f)));
+ 216 | }
+ 217 | 
+ 218 | #define TONEMAPPER_LINEAR 0
+ 219 | #define TONEMAPPER_REINHARD 1
+ 220 | #define TONEMAPPER_FILMIC 2
+ 221 | #define TONEMAPPER_ACES 3
+ 222 | #define TONEMAPPER_AGX 4
+ 223 | #define TONEMAPPER_GT7 5
+ 224 | 
+ 225 | vec3 apply_tonemapping(vec3 color) { 
+ 226 | 	if (params.tonemapper == TONEMAPPER_LINEAR) {
+ 227 | 		return color;
+ 228 | 	}
+ 229 | 
+ 230 | 	
+ 231 | 	
+ 232 | 	color = max(vec3(0.0), color);
+ 233 | 
+ 234 | 	if (params.tonemapper == TONEMAPPER_REINHARD) {
+ 235 | 		return tonemap_reinhard(color);
+ 236 | 	} else if (params.tonemapper == TONEMAPPER_FILMIC) {
+ 237 | 		return tonemap_filmic(color);
+ 238 | 	} else if (params.tonemapper == TONEMAPPER_ACES) {
+ 239 | 		return tonemap_aces(color);
+ 240 | 	} else if (params.tonemapper == TONEMAPPER_AGX) {
+ 241 | 		return tonemap_agx(color);
+ 242 | 	} else { 
+ 243 | 		return tonemap_gt7(color);
+ 244 | 	}
+ 245 | }
+ 246 | 
+ 247 | #ifdef USE_GLOW_FILTER_BICUBIC
+ 248 | 
+ 249 | float w0(float a) {
+ 250 | 	return (1.0f / 6.0f) * (a * (a * (-a + 3.0f) - 3.0f) + 1.0f);
+ 251 | }
+ 252 | 
+ 253 | float w1(float a) {
+ 254 | 	return (1.0f / 6.0f) * (a * a * (3.0f * a - 6.0f) + 4.0f);
+ 255 | }
+ 256 | 
+ 257 | float w2(float a) {
+ 258 | 	return (1.0f / 6.0f) * (a * (a * (-3.0f * a + 3.0f) + 3.0f) + 1.0f);
+ 259 | }
+ 260 | 
+ 261 | float w3(float a) {
+ 262 | 	return (1.0f / 6.0f) * (a * a * a);
+ 263 | }
+ 264 | 
+ 265 | 
+ 266 | float g0(float a) {
+ 267 | 	return w0(a) + w1(a);
+ 268 | }
+ 269 | 
+ 270 | float g1(float a) {
+ 271 | 	return w2(a) + w3(a);
+ 272 | }
+ 273 | 
+ 274 | 
+ 275 | float h0(float a) {
+ 276 | 	return -1.0f + w1(a) / (w0(a) + w1(a));
+ 277 | }
+ 278 | 
+ 279 | float h1(float a) {
+ 280 | 	return 1.0f + w3(a) / (w2(a) + w3(a));
+ 281 | }
+ 282 | 
+ 283 | #ifdef USE_MULTIVIEW
+ 284 | vec4 texture2D_bicubic(sampler2DArray tex, vec2 uv, int p_lod) {
+ 285 | 	float lod = float(p_lod);
+ 286 | 	vec2 tex_size = vec2(params.glow_texture_size >> p_lod);
+ 287 | 	vec2 pixel_size = vec2(1.0f) / tex_size;
+ 288 | 
+ 289 | 	uv = uv * tex_size + vec2(0.5f);
+ 290 | 
+ 291 | 	vec2 iuv = floor(uv);
+ 292 | 	vec2 fuv = fract(uv);
+ 293 | 
+ 294 | 	float g0x = g0(fuv.x);
+ 295 | 	float g1x = g1(fuv.x);
+ 296 | 	float h0x = h0(fuv.x);
+ 297 | 	float h1x = h1(fuv.x);
+ 298 | 	float h0y = h0(fuv.y);
+ 299 | 	float h1y = h1(fuv.y);
+ 300 | 
+ 301 | 	vec3 p0 = vec3((vec2(iuv.x + h0x, iuv.y + h0y) - vec2(0.5f)) * pixel_size, ViewIndex);
+ 302 | 	vec3 p1 = vec3((vec2(iuv.x + h1x, iuv.y + h0y) - vec2(0.5f)) * pixel_size, ViewIndex);
+ 303 | 	vec3 p2 = vec3((vec2(iuv.x + h0x, iuv.y + h1y) - vec2(0.5f)) * pixel_size, ViewIndex);
+ 304 | 	vec3 p3 = vec3((vec2(iuv.x + h1x, iuv.y + h1y) - vec2(0.5f)) * pixel_size, ViewIndex);
+ 305 | 
+ 306 | 	return (g0(fuv.y) * (g0x * textureLod(tex, p0, lod) + g1x * textureLod(tex, p1, lod))) +
+ 307 | 			(g1(fuv.y) * (g0x * textureLod(tex, p2, lod) + g1x * textureLod(tex, p3, lod)));
+ 308 | }
+ 309 | 
+ 310 | #define GLOW_TEXTURE_SAMPLE(m_tex, m_uv, m_lod) texture2D_bicubic(m_tex, m_uv, m_lod)
+ 311 | #else 
+ 312 | 
+ 313 | vec4 texture2D_bicubic(sampler2D tex, vec2 uv, int p_lod) {
+ 314 | 	float lod = float(p_lod);
+ 315 | 	vec2 tex_size = vec2(params.glow_texture_size >> p_lod);
+ 316 | 	vec2 pixel_size = vec2(1.0f) / tex_size;
+ 317 | 
+ 318 | 	uv = uv * tex_size + vec2(0.5f);
+ 319 | 
+ 320 | 	vec2 iuv = floor(uv);
+ 321 | 	vec2 fuv = fract(uv);
+ 322 | 
+ 323 | 	float g0x = g0(fuv.x);
+ 324 | 	float g1x = g1(fuv.x);
+ 325 | 	float h0x = h0(fuv.x);
+ 326 | 	float h1x = h1(fuv.x);
+ 327 | 	float h0y = h0(fuv.y);
+ 328 | 	float h1y = h1(fuv.y);
+ 329 | 
+ 330 | 	vec2 p0 = (vec2(iuv.x + h0x, iuv.y + h0y) - vec2(0.5f)) * pixel_size;
+ 331 | 	vec2 p1 = (vec2(iuv.x + h1x, iuv.y + h0y) - vec2(0.5f)) * pixel_size;
+ 332 | 	vec2 p2 = (vec2(iuv.x + h0x, iuv.y + h1y) - vec2(0.5f)) * pixel_size;
+ 333 | 	vec2 p3 = (vec2(iuv.x + h1x, iuv.y + h1y) - vec2(0.5f)) * pixel_size;
+ 334 | 
+ 335 | 	return (g0(fuv.y) * (g0x * textureLod(tex, p0, lod) + g1x * textureLod(tex, p1, lod))) +
+ 336 | 			(g1(fuv.y) * (g0x * textureLod(tex, p2, lod) + g1x * textureLod(tex, p3, lod)));
+ 337 | }
+ 338 | 
+ 339 | #define GLOW_TEXTURE_SAMPLE(m_tex, m_uv, m_lod) texture2D_bicubic(m_tex, m_uv, m_lod)
+ 340 | #endif 
+ 341 | 
+ 342 | #else 
+ 343 | 
+ 344 | #ifdef USE_MULTIVIEW
+ 345 | #define GLOW_TEXTURE_SAMPLE(m_tex, m_uv, m_lod) textureLod(m_tex, vec3(m_uv, ViewIndex), float(m_lod))
+ 346 | #else 
+ 347 | #define GLOW_TEXTURE_SAMPLE(m_tex, m_uv, m_lod) textureLod(m_tex, m_uv, float(m_lod))
+ 348 | #endif 
+ 349 | 
+ 350 | #endif 
+ 351 | 
+ 352 | vec3 gather_glow(SAMPLER_FORMAT tex, vec2 uv) { 
+ 353 | 
+ 354 | 	vec3 glow = vec3(0.0f);
+ 355 | 
+ 356 | 	if (params.glow_levels[0] > 0.0001) {
+ 357 | 		glow += GLOW_TEXTURE_SAMPLE(tex, uv, 0).rgb * params.glow_levels[0];
+ 358 | 	}
+ 359 | 
+ 360 | 	if (params.glow_levels[1] > 0.0001) {
+ 361 | 		glow += GLOW_TEXTURE_SAMPLE(tex, uv, 1).rgb * params.glow_levels[1];
+ 362 | 	}
+ 363 | 
+ 364 | 	if (params.glow_levels[2] > 0.0001) {
+ 365 | 		glow += GLOW_TEXTURE_SAMPLE(tex, uv, 2).rgb * params.glow_levels[2];
+ 366 | 	}
+ 367 | 
+ 368 | 	if (params.glow_levels[3] > 0.0001) {
+ 369 | 		glow += GLOW_TEXTURE_SAMPLE(tex, uv, 3).rgb * params.glow_levels[3];
+ 370 | 	}
+ 371 | 
+ 372 | 	if (params.glow_levels[4] > 0.0001) {
+ 373 | 		glow += GLOW_TEXTURE_SAMPLE(tex, uv, 4).rgb * params.glow_levels[4];
+ 374 | 	}
+ 375 | 
+ 376 | 	if (params.glow_levels[5] > 0.0001) {
+ 377 | 		glow += GLOW_TEXTURE_SAMPLE(tex, uv, 5).rgb * params.glow_levels[5];
+ 378 | 	}
+ 379 | 
+ 380 | 	if (params.glow_levels[6] > 0.0001) {
+ 381 | 		glow += GLOW_TEXTURE_SAMPLE(tex, uv, 6).rgb * params.glow_levels[6];
+ 382 | 	}
+ 383 | 
+ 384 | 	glow = glow * params.luminance_multiplier;
+ 385 | 
+ 386 | 	return glow;
+ 387 | }
+ 388 | 
+ 389 | #define GLOW_MODE_ADD 0
+ 390 | #define GLOW_MODE_SCREEN 1
+ 391 | #define GLOW_MODE_SOFTLIGHT 2
+ 392 | #define GLOW_MODE_REPLACE 3
+ 393 | #define GLOW_MODE_MIX 4
+ 394 | 
+ 395 | 
+ 396 | vec3 apply_glow(vec3 color, vec3 glow, float white) {
+ 397 | 	if (params.glow_mode == GLOW_MODE_ADD) {
+ 398 | 		return color + glow;
+ 399 | 	} else if (params.glow_mode == GLOW_MODE_SCREEN) {
+ 400 | 		
+ 401 | 		
+ 402 | 		
+ 403 | 		
+ 404 | 		
+ 405 | 		glow.rgb = clamp(glow.rgb, 0.0, white);
+ 406 | 
+ 407 | 		
+ 408 | 		
+ 409 | 		
+ 410 | 		
+ 411 | 		
+ 412 | 		
+ 413 | 
+ 414 | 		
+ 415 | 		color.rgb = color.rgb + glow.rgb - (color.rgb * glow.rgb / white);
+ 416 | 
+ 417 | 		return color;
+ 418 | 	} else if (params.glow_mode == GLOW_MODE_SOFTLIGHT) {
+ 419 | 		
+ 420 | 		
+ 421 | 		
+ 422 | 		
+ 423 | 		
+ 424 | 		
+ 425 | 		glow.rgb = clamp(glow.rgb, 0.0, 1.0);
+ 426 | 
+ 427 | 		color.r = color.r > 1.0 ? color.r : color.r + glow.r * ((color.r <= 0.25f ? ((16.0f * color.r - 12.0f) * color.r + 4.0f) * color.r : sqrt(color.r)) - color.r);
+ 428 | 		color.g = color.g > 1.0 ? color.g : color.g + glow.g * ((color.g <= 0.25f ? ((16.0f * color.g - 12.0f) * color.g + 4.0f) * color.g : sqrt(color.g)) - color.g);
+ 429 | 		color.b = color.b > 1.0 ? color.b : color.b + glow.b * ((color.b <= 0.25f ? ((16.0f * color.b - 12.0f) * color.b + 4.0f) * color.b : sqrt(color.b)) - color.b);
+ 430 | 
+ 431 | 		return color;
+ 432 | 	} else { 
+ 433 | 		return glow;
+ 434 | 	}
+ 435 | }
+ 436 | 
+ 437 | #ifdef USE_1D_LUT
+ 438 | vec3 apply_color_correction(vec3 color) {
+ 439 | 	color.r = texture(source_color_correction, vec2(color.r, 0.0f)).r;
+ 440 | 	color.g = texture(source_color_correction, vec2(color.g, 0.0f)).g;
+ 441 | 	color.b = texture(source_color_correction, vec2(color.b, 0.0f)).b;
+ 442 | 	return color;
+ 443 | }
+ 444 | #else
+ 445 | vec3 apply_color_correction(vec3 color) {
+ 446 | 	return textureLod(source_color_correction, color, 0.0).rgb;
+ 447 | }
+ 448 | #endif
+ 449 | 
+ 450 | 
+ 451 | 
+ 452 | 
+ 453 | 
+ 454 | 
+ 455 | 
+ 456 | 
+ 457 | 
+ 458 | 
+ 459 | 
+ 460 | 
+ 461 | 
+ 462 | 
+ 463 | 
+ 464 | 
+ 465 | 
+ 466 | 
+ 467 | 
+ 468 | 
+ 469 | 
+ 470 | 
+ 471 | 
+ 472 | 
+ 473 | 
+ 474 | 
+ 475 | 
+ 476 | 
+ 477 | 
+ 478 | 
+ 479 | 
+ 480 | 
+ 481 | 
+ 482 | 
+ 483 | 
+ 484 | 
+ 485 | 
+ 486 | 
+ 487 | 
+ 488 | 
+ 489 | 
+ 490 | 
+ 491 | 
+ 492 | 
+ 493 | 
+ 494 | 
+ 495 | 
+ 496 | 
+ 497 | 
+ 498 | 
+ 499 | 
+ 500 | 
+ 501 | 
+ 502 | 
+ 503 | 
+ 504 | 
+ 505 | 
+ 506 | 
+ 507 | 
+ 508 | 
+ 509 | 
+ 510 | 
+ 511 | 
+ 512 | 
+ 513 | 
+ 514 | float QUALITY(float q) {
+ 515 | 	return (q < 5 ? 1.0 : (q > 5 ? (q < 10 ? 2.0 : (q < 11 ? 4.0 : 8.0)) : 1.5));
+ 516 | }
+ 517 | 
+ 518 | float rgb2luma(vec3 rgb) {
+ 519 | 	return sqrt(dot(rgb, vec3(0.299, 0.587, 0.114)));
+ 520 | }
+ 521 | 
+ 522 | vec3 do_fxaa(vec3 color, float exposure, vec2 uv_interp) {
+ 523 | 	const float EDGE_THRESHOLD_MIN = 0.0312;
+ 524 | 	const float EDGE_THRESHOLD_MAX = 0.125;
+ 525 | 	const int ITERATIONS = 12;
+ 526 | 	const float SUBPIXEL_QUALITY = 0.75;
+ 527 | 
+ 528 | #ifdef USE_MULTIVIEW
+ 529 | 	float lumaUp = rgb2luma(textureLodOffset(source_color, vec3(uv_interp, ViewIndex), 0.0, ivec2(0, 1)).xyz * exposure * params.luminance_multiplier);
+ 530 | 	float lumaDown = rgb2luma(textureLodOffset(source_color, vec3(uv_interp, ViewIndex), 0.0, ivec2(0, -1)).xyz * exposure * params.luminance_multiplier);
+ 531 | 	float lumaLeft = rgb2luma(textureLodOffset(source_color, vec3(uv_interp, ViewIndex), 0.0, ivec2(-1, 0)).xyz * exposure * params.luminance_multiplier);
+ 532 | 	float lumaRight = rgb2luma(textureLodOffset(source_color, vec3(uv_interp, ViewIndex), 0.0, ivec2(1, 0)).xyz * exposure * params.luminance_multiplier);
+ 533 | 
+ 534 | 	float lumaCenter = rgb2luma(color);
+ 535 | 
+ 536 | 	float lumaMin = min(lumaCenter, min(min(lumaUp, lumaDown), min(lumaLeft, lumaRight)));
+ 537 | 	float lumaMax = max(lumaCenter, max(max(lumaUp, lumaDown), max(lumaLeft, lumaRight)));
+ 538 | 
+ 539 | 	float lumaRange = lumaMax - lumaMin;
+ 540 | 
+ 541 | 	if (lumaRange < max(EDGE_THRESHOLD_MIN, lumaMax * EDGE_THRESHOLD_MAX)) {
+ 542 | 		return color;
+ 543 | 	}
+ 544 | 
+ 545 | 	float lumaDownLeft = rgb2luma(textureLodOffset(source_color, vec3(uv_interp, ViewIndex), 0.0, ivec2(-1, -1)).xyz * exposure * params.luminance_multiplier);
+ 546 | 	float lumaUpRight = rgb2luma(textureLodOffset(source_color, vec3(uv_interp, ViewIndex), 0.0, ivec2(1, 1)).xyz * exposure * params.luminance_multiplier);
+ 547 | 	float lumaUpLeft = rgb2luma(textureLodOffset(source_color, vec3(uv_interp, ViewIndex), 0.0, ivec2(-1, 1)).xyz * exposure * params.luminance_multiplier);
+ 548 | 	float lumaDownRight = rgb2luma(textureLodOffset(source_color, vec3(uv_interp, ViewIndex), 0.0, ivec2(1, -1)).xyz * exposure * params.luminance_multiplier);
+ 549 | 
+ 550 | 	float lumaDownUp = lumaDown + lumaUp;
+ 551 | 	float lumaLeftRight = lumaLeft + lumaRight;
+ 552 | 
+ 553 | 	float lumaLeftCorners = lumaDownLeft + lumaUpLeft;
+ 554 | 	float lumaDownCorners = lumaDownLeft + lumaDownRight;
+ 555 | 	float lumaRightCorners = lumaDownRight + lumaUpRight;
+ 556 | 	float lumaUpCorners = lumaUpRight + lumaUpLeft;
+ 557 | 
+ 558 | 	float edgeHorizontal = abs(-2.0 * lumaLeft + lumaLeftCorners) + abs(-2.0 * lumaCenter + lumaDownUp) * 2.0 + abs(-2.0 * lumaRight + lumaRightCorners);
+ 559 | 	float edgeVertical = abs(-2.0 * lumaUp + lumaUpCorners) + abs(-2.0 * lumaCenter + lumaLeftRight) * 2.0 + abs(-2.0 * lumaDown + lumaDownCorners);
+ 560 | 
+ 561 | 	bool isHorizontal = (edgeHorizontal >= edgeVertical);
+ 562 | 
+ 563 | 	float stepLength = isHorizontal ? params.pixel_size.y : params.pixel_size.x;
+ 564 | 
+ 565 | 	float luma1 = isHorizontal ? lumaDown : lumaLeft;
+ 566 | 	float luma2 = isHorizontal ? lumaUp : lumaRight;
+ 567 | 	float gradient1 = luma1 - lumaCenter;
+ 568 | 	float gradient2 = luma2 - lumaCenter;
+ 569 | 
+ 570 | 	bool is1Steepest = abs(gradient1) >= abs(gradient2);
+ 571 | 
+ 572 | 	float gradientScaled = 0.25 * max(abs(gradient1), abs(gradient2));
+ 573 | 
+ 574 | 	float lumaLocalAverage = 0.0;
+ 575 | 	if (is1Steepest) {
+ 576 | 		stepLength = -stepLength;
+ 577 | 		lumaLocalAverage = 0.5 * (luma1 + lumaCenter);
+ 578 | 	} else {
+ 579 | 		lumaLocalAverage = 0.5 * (luma2 + lumaCenter);
+ 580 | 	}
+ 581 | 
+ 582 | 	vec2 currentUv = uv_interp;
+ 583 | 	if (isHorizontal) {
+ 584 | 		currentUv.y += stepLength * 0.5;
+ 585 | 	} else {
+ 586 | 		currentUv.x += stepLength * 0.5;
+ 587 | 	}
+ 588 | 
+ 589 | 	vec2 offset = isHorizontal ? vec2(params.pixel_size.x, 0.0) : vec2(0.0, params.pixel_size.y);
+ 590 | 	vec3 uv1 = vec3(currentUv - offset * QUALITY(0), ViewIndex);
+ 591 | 	vec3 uv2 = vec3(currentUv + offset * QUALITY(0), ViewIndex);
+ 592 | 
+ 593 | 	float lumaEnd1 = rgb2luma(textureLod(source_color, uv1, 0.0).xyz * exposure * params.luminance_multiplier);
+ 594 | 	float lumaEnd2 = rgb2luma(textureLod(source_color, uv2, 0.0).xyz * exposure * params.luminance_multiplier);
+ 595 | 	lumaEnd1 -= lumaLocalAverage;
+ 596 | 	lumaEnd2 -= lumaLocalAverage;
+ 597 | 
+ 598 | 	bool reached1 = abs(lumaEnd1) >= gradientScaled;
+ 599 | 	bool reached2 = abs(lumaEnd2) >= gradientScaled;
+ 600 | 	bool reachedBoth = reached1 && reached2;
+ 601 | 
+ 602 | 	if (!reached1) {
+ 603 | 		uv1 -= vec3(offset * QUALITY(1), 0.0);
+ 604 | 	}
+ 605 | 	if (!reached2) {
+ 606 | 		uv2 += vec3(offset * QUALITY(1), 0.0);
+ 607 | 	}
+ 608 | 
+ 609 | 	if (!reachedBoth) {
+ 610 | 		for (int i = 2; i < ITERATIONS; i++) {
+ 611 | 			if (!reached1) {
+ 612 | 				lumaEnd1 = rgb2luma(textureLod(source_color, uv1, 0.0).xyz * exposure * params.luminance_multiplier);
+ 613 | 				lumaEnd1 = lumaEnd1 - lumaLocalAverage;
+ 614 | 			}
+ 615 | 			if (!reached2) {
+ 616 | 				lumaEnd2 = rgb2luma(textureLod(source_color, uv2, 0.0).xyz * exposure * params.luminance_multiplier);
+ 617 | 				lumaEnd2 = lumaEnd2 - lumaLocalAverage;
+ 618 | 			}
+ 619 | 			reached1 = abs(lumaEnd1) >= gradientScaled;
+ 620 | 			reached2 = abs(lumaEnd2) >= gradientScaled;
+ 621 | 			reachedBoth = reached1 && reached2;
+ 622 | 			if (!reached1) {
+ 623 | 				uv1 -= vec3(offset * QUALITY(i), 0.0);
+ 624 | 			}
+ 625 | 			if (!reached2) {
+ 626 | 				uv2 += vec3(offset * QUALITY(i), 0.0);
+ 627 | 			}
+ 628 | 			if (reachedBoth) {
+ 629 | 				break;
+ 630 | 			}
+ 631 | 		}
+ 632 | 	}
+ 633 | 
+ 634 | 	float distance1 = isHorizontal ? (uv_interp.x - uv1.x) : (uv_interp.y - uv1.y);
+ 635 | 	float distance2 = isHorizontal ? (uv2.x - uv_interp.x) : (uv2.y - uv_interp.y);
+ 636 | 
+ 637 | 	bool isDirection1 = distance1 < distance2;
+ 638 | 	float distanceFinal = min(distance1, distance2);
+ 639 | 
+ 640 | 	float edgeThickness = (distance1 + distance2);
+ 641 | 
+ 642 | 	bool isLumaCenterSmaller = lumaCenter < lumaLocalAverage;
+ 643 | 
+ 644 | 	bool correctVariation1 = (lumaEnd1 < 0.0) != isLumaCenterSmaller;
+ 645 | 	bool correctVariation2 = (lumaEnd2 < 0.0) != isLumaCenterSmaller;
+ 646 | 
+ 647 | 	bool correctVariation = isDirection1 ? correctVariation1 : correctVariation2;
+ 648 | 
+ 649 | 	float pixelOffset = -distanceFinal / edgeThickness + 0.5;
+ 650 | 
+ 651 | 	float finalOffset = correctVariation ? pixelOffset : 0.0;
+ 652 | 
+ 653 | 	float lumaAverage = (1.0 / 12.0) * (2.0 * (lumaDownUp + lumaLeftRight) + lumaLeftCorners + lumaRightCorners);
+ 654 | 
+ 655 | 	float subPixelOffset1 = clamp(abs(lumaAverage - lumaCenter) / lumaRange, 0.0, 1.0);
+ 656 | 	float subPixelOffset2 = (-2.0 * subPixelOffset1 + 3.0) * subPixelOffset1 * subPixelOffset1;
+ 657 | 
+ 658 | 	float subPixelOffsetFinal = subPixelOffset2 * subPixelOffset2 * SUBPIXEL_QUALITY;
+ 659 | 
+ 660 | 	finalOffset = max(finalOffset, subPixelOffsetFinal);
+ 661 | 
+ 662 | 	vec3 finalUv = vec3(uv_interp, ViewIndex);
+ 663 | 	if (isHorizontal) {
+ 664 | 		finalUv.y += finalOffset * stepLength;
+ 665 | 	} else {
+ 666 | 		finalUv.x += finalOffset * stepLength;
+ 667 | 	}
+ 668 | 
+ 669 | 	vec3 finalColor = textureLod(source_color, finalUv, 0.0).xyz * exposure * params.luminance_multiplier;
+ 670 | 	return finalColor;
+ 671 | 
+ 672 | #else
+ 673 | 	float lumaUp = rgb2luma(textureLodOffset(source_color, uv_interp, 0.0, ivec2(0, 1)).xyz * exposure * params.luminance_multiplier);
+ 674 | 	float lumaDown = rgb2luma(textureLodOffset(source_color, uv_interp, 0.0, ivec2(0, -1)).xyz * exposure * params.luminance_multiplier);
+ 675 | 	float lumaLeft = rgb2luma(textureLodOffset(source_color, uv_interp, 0.0, ivec2(-1, 0)).xyz * exposure * params.luminance_multiplier);
+ 676 | 	float lumaRight = rgb2luma(textureLodOffset(source_color, uv_interp, 0.0, ivec2(1, 0)).xyz * exposure * params.luminance_multiplier);
+ 677 | 
+ 678 | 	float lumaCenter = rgb2luma(color);
+ 679 | 
+ 680 | 	float lumaMin = min(lumaCenter, min(min(lumaUp, lumaDown), min(lumaLeft, lumaRight)));
+ 681 | 	float lumaMax = max(lumaCenter, max(max(lumaUp, lumaDown), max(lumaLeft, lumaRight)));
+ 682 | 
+ 683 | 	float lumaRange = lumaMax - lumaMin;
+ 684 | 
+ 685 | 	if (lumaRange < max(EDGE_THRESHOLD_MIN, lumaMax * EDGE_THRESHOLD_MAX)) {
+ 686 | 		return color;
+ 687 | 	}
+ 688 | 
+ 689 | 	float lumaDownLeft = rgb2luma(textureLodOffset(source_color, uv_interp, 0.0, ivec2(-1, -1)).xyz * exposure * params.luminance_multiplier);
+ 690 | 	float lumaUpRight = rgb2luma(textureLodOffset(source_color, uv_interp, 0.0, ivec2(1, 1)).xyz * exposure * params.luminance_multiplier);
+ 691 | 	float lumaUpLeft = rgb2luma(textureLodOffset(source_color, uv_interp, 0.0, ivec2(-1, 1)).xyz * exposure * params.luminance_multiplier);
+ 692 | 	float lumaDownRight = rgb2luma(textureLodOffset(source_color, uv_interp, 0.0, ivec2(1, -1)).xyz * exposure * params.luminance_multiplier);
+ 693 | 
+ 694 | 	float lumaDownUp = lumaDown + lumaUp;
+ 695 | 	float lumaLeftRight = lumaLeft + lumaRight;
+ 696 | 
+ 697 | 	float lumaLeftCorners = lumaDownLeft + lumaUpLeft;
+ 698 | 	float lumaDownCorners = lumaDownLeft + lumaDownRight;
+ 699 | 	float lumaRightCorners = lumaDownRight + lumaUpRight;
+ 700 | 	float lumaUpCorners = lumaUpRight + lumaUpLeft;
+ 701 | 
+ 702 | 	float edgeHorizontal = abs(-2.0 * lumaLeft + lumaLeftCorners) + abs(-2.0 * lumaCenter + lumaDownUp) * 2.0 + abs(-2.0 * lumaRight + lumaRightCorners);
+ 703 | 	float edgeVertical = abs(-2.0 * lumaUp + lumaUpCorners) + abs(-2.0 * lumaCenter + lumaLeftRight) * 2.0 + abs(-2.0 * lumaDown + lumaDownCorners);
+ 704 | 
+ 705 | 	bool isHorizontal = (edgeHorizontal >= edgeVertical);
+ 706 | 
+ 707 | 	float stepLength = isHorizontal ? params.pixel_size.y : params.pixel_size.x;
+ 708 | 
+ 709 | 	float luma1 = isHorizontal ? lumaDown : lumaLeft;
+ 710 | 	float luma2 = isHorizontal ? lumaUp : lumaRight;
+ 711 | 	float gradient1 = luma1 - lumaCenter;
+ 712 | 	float gradient2 = luma2 - lumaCenter;
+ 713 | 
+ 714 | 	bool is1Steepest = abs(gradient1) >= abs(gradient2);
+ 715 | 
+ 716 | 	float gradientScaled = 0.25 * max(abs(gradient1), abs(gradient2));
+ 717 | 
+ 718 | 	float lumaLocalAverage = 0.0;
+ 719 | 	if (is1Steepest) {
+ 720 | 		stepLength = -stepLength;
+ 721 | 		lumaLocalAverage = 0.5 * (luma1 + lumaCenter);
+ 722 | 	} else {
+ 723 | 		lumaLocalAverage = 0.5 * (luma2 + lumaCenter);
+ 724 | 	}
+ 725 | 
+ 726 | 	vec2 currentUv = uv_interp;
+ 727 | 	if (isHorizontal) {
+ 728 | 		currentUv.y += stepLength * 0.5;
+ 729 | 	} else {
+ 730 | 		currentUv.x += stepLength * 0.5;
+ 731 | 	}
+ 732 | 
+ 733 | 	vec2 offset = isHorizontal ? vec2(params.pixel_size.x, 0.0) : vec2(0.0, params.pixel_size.y);
+ 734 | 	vec2 uv1 = currentUv - offset * QUALITY(0);
+ 735 | 	vec2 uv2 = currentUv + offset * QUALITY(0);
+ 736 | 
+ 737 | 	float lumaEnd1 = rgb2luma(textureLod(source_color, uv1, 0.0).xyz * exposure * params.luminance_multiplier);
+ 738 | 	float lumaEnd2 = rgb2luma(textureLod(source_color, uv2, 0.0).xyz * exposure * params.luminance_multiplier);
+ 739 | 	lumaEnd1 -= lumaLocalAverage;
+ 740 | 	lumaEnd2 -= lumaLocalAverage;
+ 741 | 
+ 742 | 	bool reached1 = abs(lumaEnd1) >= gradientScaled;
+ 743 | 	bool reached2 = abs(lumaEnd2) >= gradientScaled;
+ 744 | 	bool reachedBoth = reached1 && reached2;
+ 745 | 
+ 746 | 	if (!reached1) {
+ 747 | 		uv1 -= offset * QUALITY(1);
+ 748 | 	}
+ 749 | 	if (!reached2) {
+ 750 | 		uv2 += offset * QUALITY(1);
+ 751 | 	}
+ 752 | 
+ 753 | 	if (!reachedBoth) {
+ 754 | 		for (int i = 2; i < ITERATIONS; i++) {
+ 755 | 			if (!reached1) {
+ 756 | 				lumaEnd1 = rgb2luma(textureLod(source_color, uv1, 0.0).xyz * exposure * params.luminance_multiplier);
+ 757 | 				lumaEnd1 = lumaEnd1 - lumaLocalAverage;
+ 758 | 			}
+ 759 | 			if (!reached2) {
+ 760 | 				lumaEnd2 = rgb2luma(textureLod(source_color, uv2, 0.0).xyz * exposure * params.luminance_multiplier);
+ 761 | 				lumaEnd2 = lumaEnd2 - lumaLocalAverage;
+ 762 | 			}
+ 763 | 			reached1 = abs(lumaEnd1) >= gradientScaled;
+ 764 | 			reached2 = abs(lumaEnd2) >= gradientScaled;
+ 765 | 			reachedBoth = reached1 && reached2;
+ 766 | 			if (!reached1) {
+ 767 | 				uv1 -= offset * QUALITY(i);
+ 768 | 			}
+ 769 | 			if (!reached2) {
+ 770 | 				uv2 += offset * QUALITY(i);
+ 771 | 			}
+ 772 | 			if (reachedBoth) {
+ 773 | 				break;
+ 774 | 			}
+ 775 | 		}
+ 776 | 	}
+ 777 | 
+ 778 | 	float distance1 = isHorizontal ? (uv_interp.x - uv1.x) : (uv_interp.y - uv1.y);
+ 779 | 	float distance2 = isHorizontal ? (uv2.x - uv_interp.x) : (uv2.y - uv_interp.y);
+ 780 | 
+ 781 | 	bool isDirection1 = distance1 < distance2;
+ 782 | 	float distanceFinal = min(distance1, distance2);
+ 783 | 
+ 784 | 	float edgeThickness = (distance1 + distance2);
+ 785 | 
+ 786 | 	bool isLumaCenterSmaller = lumaCenter < lumaLocalAverage;
+ 787 | 
+ 788 | 	bool correctVariation1 = (lumaEnd1 < 0.0) != isLumaCenterSmaller;
+ 789 | 	bool correctVariation2 = (lumaEnd2 < 0.0) != isLumaCenterSmaller;
+ 790 | 
+ 791 | 	bool correctVariation = isDirection1 ? correctVariation1 : correctVariation2;
+ 792 | 
+ 793 | 	float pixelOffset = -distanceFinal / edgeThickness + 0.5;
+ 794 | 
+ 795 | 	float finalOffset = correctVariation ? pixelOffset : 0.0;
+ 796 | 
+ 797 | 	float lumaAverage = (1.0 / 12.0) * (2.0 * (lumaDownUp + lumaLeftRight) + lumaLeftCorners + lumaRightCorners);
+ 798 | 
+ 799 | 	float subPixelOffset1 = clamp(abs(lumaAverage - lumaCenter) / lumaRange, 0.0, 1.0);
+ 800 | 	float subPixelOffset2 = (-2.0 * subPixelOffset1 + 3.0) * subPixelOffset1 * subPixelOffset1;
+ 801 | 
+ 802 | 	float subPixelOffsetFinal = subPixelOffset2 * subPixelOffset2 * SUBPIXEL_QUALITY;
+ 803 | 
+ 804 | 	finalOffset = max(finalOffset, subPixelOffsetFinal);
+ 805 | 
+ 806 | 	vec2 finalUv = uv_interp;
+ 807 | 	if (isHorizontal) {
+ 808 | 		finalUv.y += finalOffset * stepLength;
+ 809 | 	} else {
+ 810 | 		finalUv.x += finalOffset * stepLength;
+ 811 | 	}
+ 812 | 
+ 813 | 	vec3 finalColor = textureLod(source_color, finalUv, 0.0).xyz * exposure * params.luminance_multiplier;
+ 814 | 	return finalColor;
+ 815 | 
+ 816 | #endif
+ 817 | }
+ 818 | 
+ 819 | 
+ 820 | 
+ 821 | 
+ 822 | 
+ 823 | 
+ 824 | vec3 screen_space_dither(vec2 frag_coord, float bit_alignment_diviser) {
+ 825 | 	
+ 826 | 	
+ 827 | 	vec3 dither = vec3(dot(vec2(171.0, 231.0), frag_coord));
+ 828 | 	dither.rgb = fract(dither.rgb / vec3(103.0, 71.0, 97.0));
+ 829 | 
+ 830 | 	
+ 831 | 	
+ 832 | 	return (dither.rgb - 0.5) / bit_alignment_diviser;
+ 833 | }
+ 834 | 
+ 835 | void main() {
+ 836 | #ifdef USE_MULTIVIEW
+ 837 | 	vec4 color = textureLod(source_color, vec3(uv_interp, ViewIndex), 0.0f);
+ 838 | #else
+ 839 | 	vec4 color = textureLod(source_color, uv_interp, 0.0f);
+ 840 | #endif
+ 841 | 	color.rgb *= params.luminance_multiplier;
+ 842 | 
+ 843 | 	
+ 844 | 
+ 845 | 	float exposure = params.exposure;
+ 846 | 
+ 847 | 	if (bool(params.flags & FLAG_USE_AUTO_EXPOSURE)) {
+ 848 | 		exposure *= 1.0 / (texelFetch(source_auto_exposure, ivec2(0, 0), 0).r * params.luminance_multiplier / params.auto_exposure_scale);
+ 849 | 	}
+ 850 | 
+ 851 | 	color.rgb *= exposure;
+ 852 | 
+ 853 | 	
+ 854 | 	if (bool(params.flags & FLAG_USE_FXAA)) {
+ 855 | 		
+ 856 | 		color.rgb = do_fxaa(color.rgb, exposure, uv_interp);
+ 857 | 	}
+ 858 | 
+ 859 | 	if (bool(params.flags & FLAG_USE_GLOW) && params.glow_mode != GLOW_MODE_SOFTLIGHT) {
+ 860 | 		vec3 glow = gather_glow(source_glow, uv_interp) * params.glow_intensity;
+ 861 | 		if (params.glow_map_strength > 0.001) {
+ 862 | 			glow = mix(glow, texture(glow_map, uv_interp).rgb * glow, params.glow_map_strength);
+ 863 | 		}
+ 864 | 
+ 865 | 		if (params.glow_mode == GLOW_MODE_MIX) {
+ 866 | 			color.rgb = color.rgb * (1.0 - params.glow_intensity) + glow;
+ 867 | 		} else {
+ 868 | 			color.rgb = apply_glow(color.rgb, glow, params.white);
+ 869 | 		}
+ 870 | 	}
+ 871 | 
+ 872 | 	
+ 873 | 
+ 874 | 	color.rgb = apply_tonemapping(color.rgb);
+ 875 | 
+ 876 | 	
+ 877 | 
+ 878 | 	if (bool(params.flags & FLAG_USE_GLOW) && params.glow_mode == GLOW_MODE_SOFTLIGHT) {
+ 879 | 		
+ 880 | 		
+ 881 | 		
+ 882 | 		vec3 glow = gather_glow(source_glow, uv_interp) * params.glow_intensity;
+ 883 | 		if (params.glow_map_strength > 0.001) {
+ 884 | 			glow = mix(glow, texture(glow_map, uv_interp).rgb * glow, params.glow_map_strength);
+ 885 | 		}
+ 886 | 		glow = apply_tonemapping(glow);
+ 887 | 		color.rgb = apply_glow(color.rgb, glow, params.white);
+ 888 | 	}
+ 889 | 
+ 890 | 	
+ 891 | 
+ 892 | 	if (bool(params.flags & FLAG_USE_BCS)) {
+ 893 | 		
+ 894 | 		
+ 895 | 		
+ 896 | 		
+ 897 | 		color.rgb = color.rgb * params.bcs.x;
+ 898 | 
+ 899 | 		color.rgb = linear_to_srgb(color.rgb);
+ 900 | 
+ 901 | 		
+ 902 | 		
+ 903 | 		
+ 904 | 		
+ 905 | 		
+ 906 | 		color.rgb = mix(vec3(0.5), color.rgb, params.bcs.y);
+ 907 | 
+ 908 | 		
+ 909 | 		
+ 910 | 		
+ 911 | 		
+ 912 | 		color.rgb = mix(vec3(dot(vec3(1.0), color.rgb) * (1.0 / 3.0)), color.rgb, params.bcs.z);
+ 913 | 
+ 914 | 		if (bool(params.flags & FLAG_USE_COLOR_CORRECTION)) {
+ 915 | 			color.rgb = clamp(color.rgb, vec3(0.0), vec3(1.0));
+ 916 | 			color.rgb = apply_color_correction(color.rgb);
+ 917 | 			
+ 918 | 			
+ 919 | 			
+ 920 | 		} else if (!bool(params.flags & FLAG_CONVERT_TO_SRGB)) {
+ 921 | 			color.rgb = srgb_to_linear(color.rgb);
+ 922 | 		}
+ 923 | 	} else if (bool(params.flags & FLAG_CONVERT_TO_SRGB)) {
+ 924 | 		color.rgb = linear_to_srgb(color.rgb);
+ 925 | 	}
+ 926 | 
+ 927 | 	
+ 928 | 	
+ 929 | 
+ 930 | 	if (bool(params.flags & FLAG_USE_8_BIT_DEBANDING)) {
+ 931 | 		
+ 932 | 		color.rgb += screen_space_dither(gl_FragCoord.xy, 255.0);
+ 933 | 	}
+ 934 | 
+ 935 | 	frag_color = color;
+ 936 | }
+ 937 | 
+ 938 | 
+   at: compile_stages (servers/rendering/renderer_rd/shader_rd.cpp:1184)
+ERROR: Condition "variant_stages.is_empty()" is true.
+   at: _compile_variant (servers/rendering/renderer_rd/shader_rd.cpp:414)
+ERROR: code:
+   1 | 
+   2 | #version 450
+   3 | 
+   4 | 
+   5 | 
+   6 | #define USE_GLOW_FILTER_BICUBIC
+   7 | 
+   8 | #define RENDER_DRIVER_METAL
+   9 | #define samplerExternalOES sampler2D
+  10 | #define textureExternalOES texture2D
+  11 | 
+  12 | #ifdef USE_MULTIVIEW
+  13 | #extension GL_EXT_multiview : enable
+  14 | #define ViewIndex gl_ViewIndex
+  15 | #endif 
+  16 | 
+  17 | layout(location = 0) in vec2 uv_interp;
+  18 | 
+  19 | #ifdef USE_MULTIVIEW
+  20 | #define SAMPLER_FORMAT sampler2DArray
+  21 | #else
+  22 | #define SAMPLER_FORMAT sampler2D
+  23 | #endif
+  24 | 
+  25 | layout(set = 0, binding = 0) uniform SAMPLER_FORMAT source_color;
+  26 | layout(set = 1, binding = 0) uniform sampler2D source_auto_exposure;
+  27 | layout(set = 2, binding = 0) uniform SAMPLER_FORMAT source_glow;
+  28 | layout(set = 2, binding = 1) uniform sampler2D glow_map; 
+  29 | 
+  30 | #ifdef USE_1D_LUT
+  31 | layout(set = 3, binding = 0) uniform sampler2D source_color_correction;
+  32 | #else
+  33 | layout(set = 3, binding = 0) uniform sampler3D source_color_correction;
+  34 | #endif
+  35 | 
+  36 | #define FLAG_USE_BCS (1 << 0)
+  37 | #define FLAG_USE_GLOW (1 << 1)
+  38 | #define FLAG_USE_AUTO_EXPOSURE (1 << 2)
+  39 | #define FLAG_USE_COLOR_CORRECTION (1 << 3)
+  40 | #define FLAG_USE_FXAA (1 << 4)
+  41 | #define FLAG_USE_8_BIT_DEBANDING (1 << 5)
+  42 | #define FLAG_CONVERT_TO_SRGB (1 << 6)
+  43 | 
+  44 | layout(push_constant, std430) uniform Params {
+  45 | 	vec3 bcs;
+  46 | 	uint flags;
+  47 | 
+  48 | 	vec2 pixel_size;
+  49 | 	uint tonemapper;
+  50 | 	float output_max_value;
+  51 | 
+  52 | 	uvec2 glow_texture_size;
+  53 | 	float glow_intensity;
+  54 | 	float glow_map_strength;
+  55 | 
+  56 | 	uint glow_mode;
+  57 | 	float glow_levels[7];
+  58 | 
+  59 | 	float exposure;
+  60 | 	float white;
+  61 | 	float auto_exposure_scale;
+  62 | 	float luminance_multiplier;
+  63 | 
+  64 | 	vec4 tonemapper_params;
+  65 | }
+  66 | params;
+  67 | 
+  68 | layout(location = 0) out vec4 frag_color;
+  69 | 
+  70 | 
+  71 | vec3 tonemap_reinhard(vec3 color) {
+  72 | 	float white_squared = params.tonemapper_params.x;
+  73 | 	
+  74 | 	return color * (1.0f + color / white_squared) / (1.0f + color / params.output_max_value);
+  75 | }
+  76 | 
+  77 | vec3 tonemap_filmic(vec3 color) {
+  78 | 	
+  79 | 	
+  80 | 	
+  81 | 	
+  82 | 	const float exposure_bias = 2.0f;
+  83 | 	const float A = 0.22f * exposure_bias * exposure_bias; 
+  84 | 	const float B = 0.30f * exposure_bias;
+  85 | 	const float C = 0.10f;
+  86 | 	const float D = 0.20f;
+  87 | 	const float E = 0.01f;
+  88 | 	const float F = 0.30f;
+  89 | 
+  90 | 	vec3 color_tonemapped = ((color * (A * color + C * B) + D * E) / (color * (A * color + B) + D * F)) - E / F;
+  91 | 
+  92 | 	return color_tonemapped / params.tonemapper_params.x;
+  93 | }
+  94 | 
+  95 | 
+  96 | 
+  97 | vec3 tonemap_aces(vec3 color) {
+  98 | 	
+  99 | 	const float exposure_bias = 1.8f;
+ 100 | 	const float A = 0.0245786f;
+ 101 | 	const float B = 0.000090537f;
+ 102 | 	const float C = 0.983729f;
+ 103 | 	const float D = 0.432951f;
+ 104 | 	const float E = 0.238081f;
+ 105 | 
+ 106 | 	
+ 107 | 	const mat3 rgb_to_rrt = mat3(
+ 108 | 			vec3(0.59719f * exposure_bias, 0.35458f * exposure_bias, 0.04823f * exposure_bias),
+ 109 | 			vec3(0.07600f * exposure_bias, 0.90834f * exposure_bias, 0.01566f * exposure_bias),
+ 110 | 			vec3(0.02840f * exposure_bias, 0.13383f * exposure_bias, 0.83777f * exposure_bias));
+ 111 | 
+ 112 | 	const mat3 odt_to_rgb = mat3(
+ 113 | 			vec3(1.60475f, -0.53108f, -0.07367f),
+ 114 | 			vec3(-0.10208f, 1.10813f, -0.00605f),
+ 115 | 			vec3(-0.00327f, -0.07276f, 1.07602f));
+ 116 | 
+ 117 | 	color *= rgb_to_rrt;
+ 118 | 	vec3 color_tonemapped = (color * (color + A) - B) / (color * (C * color + D) + E);
+ 119 | 	color_tonemapped *= odt_to_rgb;
+ 120 | 
+ 121 | 	return color_tonemapped / params.tonemapper_params.x;
+ 122 | }
+ 123 | 
+ 124 | 
+ 125 | 
+ 126 | 
+ 127 | vec3 allenwp_curve(vec3 x) {
+ 128 | 	
+ 129 | 	
+ 130 | 	const float awp_crossover_point = 0.18;
+ 131 | 	
+ 132 | 	
+ 133 | 	const float awp_shoulder_max = params.output_max_value - awp_crossover_point;
+ 134 | 
+ 135 | 	float awp_contrast = params.tonemapper_params.x;
+ 136 | 	float awp_toe_a = params.tonemapper_params.y;
+ 137 | 	float awp_slope = params.tonemapper_params.z;
+ 138 | 	float awp_w = params.tonemapper_params.w;
+ 139 | 
+ 140 | 	
+ 141 | 	vec3 s = x - awp_crossover_point;
+ 142 | 	vec3 slope_s = awp_slope * s;
+ 143 | 	s = slope_s * (1.0 + s / awp_w) / (1.0 + (slope_s / awp_shoulder_max));
+ 144 | 	s += awp_crossover_point;
+ 145 | 
+ 146 | 	
+ 147 | 	vec3 t = pow(x, vec3(awp_contrast));
+ 148 | 	t = t / (t + awp_toe_a);
+ 149 | 
+ 150 | 	return mix(s, t, lessThan(x, vec3(awp_crossover_point)));
+ 151 | }
+ 152 | 
+ 153 | 
+ 154 | 
+ 155 | 
+ 156 | 
+ 157 | vec3 tonemap_agx(vec3 color) {
+ 158 | 	
+ 159 | 	
+ 160 | 	
+ 161 | 	
+ 162 | 	
+ 163 | 	
+ 164 | 	
+ 165 | 	
+ 166 | 	
+ 167 | 	
+ 168 | 	
+ 169 | 	
+ 170 | 	
+ 171 | 	
+ 172 | 	
+ 173 | 	
+ 174 | 	
+ 175 | 
+ 176 | 	
+ 177 | 	const mat3 rec709_to_rec2020_agx_inset_matrix = mat3(
+ 178 | 			0.544814746488245, 0.140416948464053, 0.0888104196149096,
+ 179 | 			0.373787398372697, 0.754137554567394, 0.178871756420858,
+ 180 | 			0.0813978551390581, 0.105445496968552, 0.732317823964232);
+ 181 | 
+ 182 | 	
+ 183 | 	const mat3 agx_outset_rec2020_to_rec709_matrix = mat3(
+ 184 | 			1.96488741169489, -0.299313364904742, -0.164352742528393,
+ 185 | 			-0.855988495690215, 1.32639796461980, -0.238183969428088,
+ 186 | 			-0.108898916004672, -0.0270845997150571, 1.40253671195648);
+ 187 | 
+ 188 | 	
+ 189 | 	color = rec709_to_rec2020_agx_inset_matrix * color;
+ 190 | 
+ 191 | 	
+ 192 | 	
+ 193 | 	color = allenwp_curve(color);
+ 194 | 
+ 195 | 	
+ 196 | 	
+ 197 | 	color = min(vec3(params.output_max_value), color);
+ 198 | 
+ 199 | 	
+ 200 | 	color = agx_outset_rec2020_to_rec709_matrix * color;
+ 201 | 
+ 202 | 	
+ 203 | 	
+ 204 | 	
+ 205 | 	return color;
+ 206 | }
+ 207 | 
+ 208 | vec3 linear_to_srgb(vec3 color) {
+ 209 | 	const vec3 a = vec3(0.055f);
+ 210 | 	return mix((vec3(1.0f) + a) * pow(color.rgb, vec3(1.0f / 2.4f)) - a, 12.92f * color.rgb, lessThan(color.rgb, vec3(0.0031308f)));
+ 211 | }
+ 212 | 
+ 213 | vec3 srgb_to_linear(vec3 color) {
+ 214 | 	const vec3 a = vec3(0.055f);
+ 215 | 	return mix(pow((color.rgb + a) * (1.0f / (vec3(1.0f) + a)), vec3(2.4f)), color.rgb * (1.0f / 12.92f), lessThan(color.rgb, vec3(0.04045f)));
+ 216 | }
+ 217 | 
+ 218 | #define TONEMAPPER_LINEAR 0
+ 219 | #define TONEMAPPER_REINHARD 1
+ 220 | #define TONEMAPPER_FILMIC 2
+ 221 | #define TONEMAPPER_ACES 3
+ 222 | #define TONEMAPPER_AGX 4
+ 223 | #define TONEMAPPER_GT7 5
+ 224 | 
+ 225 | vec3 apply_tonemapping(vec3 color) { 
+ 226 | 	if (params.tonemapper == TONEMAPPER_LINEAR) {
+ 227 | 		return color;
+ 228 | 	}
+ 229 | 
+ 230 | 	
+ 231 | 	
+ 232 | 	color = max(vec3(0.0), color);
+ 233 | 
+ 234 | 	if (params.tonemapper == TONEMAPPER_REINHARD) {
+ 235 | 		return tonemap_reinhard(color);
+ 236 | 	} else if (params.tonemapper == TONEMAPPER_FILMIC) {
+ 237 | 		return tonemap_filmic(color);
+ 238 | 	} else if (params.tonemapper == TONEMAPPER_ACES) {
+ 239 | 		return tonemap_aces(color);
+ 240 | 	} else if (params.tonemapper == TONEMAPPER_AGX) {
+ 241 | 		return tonemap_agx(color);
+ 242 | 	} else { 
+ 243 | 		return tonemap_gt7(color);
+ 244 | 	}
+ 245 | }
+ 246 | 
+ 247 | #ifdef USE_GLOW_FILTER_BICUBIC
+ 248 | 
+ 249 | float w0(float a) {
+ 250 | 	return (1.0f / 6.0f) * (a * (a * (-a + 3.0f) - 3.0f) + 1.0f);
+ 251 | }
+ 252 | 
+ 253 | float w1(float a) {
+ 254 | 	return (1.0f / 6.0f) * (a * a * (3.0f * a - 6.0f) + 4.0f);
+ 255 | }
+ 256 | 
+ 257 | float w2(float a) {
+ 258 | 	return (1.0f / 6.0f) * (a * (a * (-3.0f * a + 3.0f) + 3.0f) + 1.0f);
+ 259 | }
+ 260 | 
+ 261 | float w3(float a) {
+ 262 | 	return (1.0f / 6.0f) * (a * a * a);
+ 263 | }
+ 264 | 
+ 265 | 
+ 266 | float g0(float a) {
+ 267 | 	return w0(a) + w1(a);
+ 268 | }
+ 269 | 
+ 270 | float g1(float a) {
+ 271 | 	return w2(a) + w3(a);
+ 272 | }
+ 273 | 
+ 274 | 
+ 275 | float h0(float a) {
+ 276 | 	return -1.0f + w1(a) / (w0(a) + w1(a));
+ 277 | }
+ 278 | 
+ 279 | float h1(float a) {
+ 280 | 	return 1.0f + w3(a) / (w2(a) + w3(a));
+ 281 | }
+ 282 | 
+ 283 | #ifdef USE_MULTIVIEW
+ 284 | vec4 texture2D_bicubic(sampler2DArray tex, vec2 uv, int p_lod) {
+ 285 | 	float lod = float(p_lod);
+ 286 | 	vec2 tex_size = vec2(params.glow_texture_size >> p_lod);
+ 287 | 	vec2 pixel_size = vec2(1.0f) / tex_size;
+ 288 | 
+ 289 | 	uv = uv * tex_size + vec2(0.5f);
+ 290 | 
+ 291 | 	vec2 iuv = floor(uv);
+ 292 | 	vec2 fuv = fract(uv);
+ 293 | 
+ 294 | 	float g0x = g0(fuv.x);
+ 295 | 	float g1x = g1(fuv.x);
+ 296 | 	float h0x = h0(fuv.x);
+ 297 | 	float h1x = h1(fuv.x);
+ 298 | 	float h0y = h0(fuv.y);
+ 299 | 	float h1y = h1(fuv.y);
+ 300 | 
+ 301 | 	vec3 p0 = vec3((vec2(iuv.x + h0x, iuv.y + h0y) - vec2(0.5f)) * pixel_size, ViewIndex);
+ 302 | 	vec3 p1 = vec3((vec2(iuv.x + h1x, iuv.y + h0y) - vec2(0.5f)) * pixel_size, ViewIndex);
+ 303 | 	vec3 p2 = vec3((vec2(iuv.x + h0x, iuv.y + h1y) - vec2(0.5f)) * pixel_size, ViewIndex);
+ 304 | 	vec3 p3 = vec3((vec2(iuv.x + h1x, iuv.y + h1y) - vec2(0.5f)) * pixel_size, ViewIndex);
+ 305 | 
+ 306 | 	return (g0(fuv.y) * (g0x * textureLod(tex, p0, lod) + g1x * textureLod(tex, p1, lod))) +
+ 307 | 			(g1(fuv.y) * (g0x * textureLod(tex, p2, lod) + g1x * textureLod(tex, p3, lod)));
+ 308 | }
+ 309 | 
+ 310 | #define GLOW_TEXTURE_SAMPLE(m_tex, m_uv, m_lod) texture2D_bicubic(m_tex, m_uv, m_lod)
+ 311 | #else 
+ 312 | 
+ 313 | vec4 texture2D_bicubic(sampler2D tex, vec2 uv, int p_lod) {
+ 314 | 	float lod = float(p_lod);
+ 315 | 	vec2 tex_size = vec2(params.glow_texture_size >> p_lod);
+ 316 | 	vec2 pixel_size = vec2(1.0f) / tex_size;
+ 317 | 
+ 318 | 	uv = uv * tex_size + vec2(0.5f);
+ 319 | 
+ 320 | 	vec2 iuv = floor(uv);
+ 321 | 	vec2 fuv = fract(uv);
+ 322 | 
+ 323 | 	float g0x = g0(fuv.x);
+ 324 | 	float g1x = g1(fuv.x);
+ 325 | 	float h0x = h0(fuv.x);
+ 326 | 	float h1x = h1(fuv.x);
+ 327 | 	float h0y = h0(fuv.y);
+ 328 | 	float h1y = h1(fuv.y);
+ 329 | 
+ 330 | 	vec2 p0 = (vec2(iuv.x + h0x, iuv.y + h0y) - vec2(0.5f)) * pixel_size;
+ 331 | 	vec2 p1 = (vec2(iuv.x + h1x, iuv.y + h0y) - vec2(0.5f)) * pixel_size;
+ 332 | 	vec2 p2 = (vec2(iuv.x + h0x, iuv.y + h1y) - vec2(0.5f)) * pixel_size;
+ 333 | 	vec2 p3 = (vec2(iuv.x + h1x, iuv.y + h1y) - vec2(0.5f)) * pixel_size;
+ 334 | 
+ 335 | 	return (g0(fuv.y) * (g0x * textureLod(tex, p0, lod) + g1x * textureLod(tex, p1, lod))) +
+ 336 | 			(g1(fuv.y) * (g0x * textureLod(tex, p2, lod) + g1x * textureLod(tex, p3, lod)));
+ 337 | }
+ 338 | 
+ 339 | #define GLOW_TEXTURE_SAMPLE(m_tex, m_uv, m_lod) texture2D_bicubic(m_tex, m_uv, m_lod)
+ 340 | #endif 
+ 341 | 
+ 342 | #else 
+ 343 | 
+ 344 | #ifdef USE_MULTIVIEW
+ 345 | #define GLOW_TEXTURE_SAMPLE(m_tex, m_uv, m_lod) textureLod(m_tex, vec3(m_uv, ViewIndex), float(m_lod))
+ 346 | #else 
+ 347 | #define GLOW_TEXTURE_SAMPLE(m_tex, m_uv, m_lod) textureLod(m_tex, m_uv, float(m_lod))
+ 348 | #endif 
+ 349 | 
+ 350 | #endif 
+ 351 | 
+ 352 | vec3 gather_glow(SAMPLER_FORMAT tex, vec2 uv) { 
+ 353 | 
+ 354 | 	vec3 glow = vec3(0.0f);
+ 355 | 
+ 356 | 	if (params.glow_levels[0] > 0.0001) {
+ 357 | 		glow += GLOW_TEXTURE_SAMPLE(tex, uv, 0).rgb * params.glow_levels[0];
+ 358 | 	}
+ 359 | 
+ 360 | 	if (params.glow_levels[1] > 0.0001) {
+ 361 | 		glow += GLOW_TEXTURE_SAMPLE(tex, uv, 1).rgb * params.glow_levels[1];
+ 362 | 	}
+ 363 | 
+ 364 | 	if (params.glow_levels[2] > 0.0001) {
+ 365 | 		glow += GLOW_TEXTURE_SAMPLE(tex, uv, 2).rgb * params.glow_levels[2];
+ 366 | 	}
+ 367 | 
+ 368 | 	if (params.glow_levels[3] > 0.0001) {
+ 369 | 		glow += GLOW_TEXTURE_SAMPLE(tex, uv, 3).rgb * params.glow_levels[3];
+ 370 | 	}
+ 371 | 
+ 372 | 	if (params.glow_levels[4] > 0.0001) {
+ 373 | 		glow += GLOW_TEXTURE_SAMPLE(tex, uv, 4).rgb * params.glow_levels[4];
+ 374 | 	}
+ 375 | 
+ 376 | 	if (params.glow_levels[5] > 0.0001) {
+ 377 | 		glow += GLOW_TEXTURE_SAMPLE(tex, uv, 5).rgb * params.glow_levels[5];
+ 378 | 	}
+ 379 | 
+ 380 | 	if (params.glow_levels[6] > 0.0001) {
+ 381 | 		glow += GLOW_TEXTURE_SAMPLE(tex, uv, 6).rgb * params.glow_levels[6];
+ 382 | 	}
+ 383 | 
+ 384 | 	glow = glow * params.luminance_multiplier;
+ 385 | 
+ 386 | 	return glow;
+ 387 | }
+ 388 | 
+ 389 | #define GLOW_MODE_ADD 0
+ 390 | #define GLOW_MODE_SCREEN 1
+ 391 | #define GLOW_MODE_SOFTLIGHT 2
+ 392 | #define GLOW_MODE_REPLACE 3
+ 393 | #define GLOW_MODE_MIX 4
+ 394 | 
+ 395 | 
+ 396 | vec3 apply_glow(vec3 color, vec3 glow, float white) {
+ 397 | 	if (params.glow_mode == GLOW_MODE_ADD) {
+ 398 | 		return color + glow;
+ 399 | 	} else if (params.glow_mode == GLOW_MODE_SCREEN) {
+ 400 | 		
+ 401 | 		
+ 402 | 		
+ 403 | 		
+ 404 | 		
+ 405 | 		glow.rgb = clamp(glow.rgb, 0.0, white);
+ 406 | 
+ 407 | 		
+ 408 | 		
+ 409 | 		
+ 410 | 		
+ 411 | 		
+ 412 | 		
+ 413 | 
+ 414 | 		
+ 415 | 		color.rgb = color.rgb + glow.rgb - (color.rgb * glow.rgb / white);
+ 416 | 
+ 417 | 		return color;
+ 418 | 	} else if (params.glow_mode == GLOW_MODE_SOFTLIGHT) {
+ 419 | 		
+ 420 | 		
+ 421 | 		
+ 422 | 		
+ 423 | 		
+ 424 | 		
+ 425 | 		glow.rgb = clamp(glow.rgb, 0.0, 1.0);
+ 426 | 
+ 427 | 		color.r = color.r > 1.0 ? color.r : color.r + glow.r * ((color.r <= 0.25f ? ((16.0f * color.r - 12.0f) * color.r + 4.0f) * color.r : sqrt(color.r)) - color.r);
+ 428 | 		color.g = color.g > 1.0 ? color.g : color.g + glow.g * ((color.g <= 0.25f ? ((16.0f * color.g - 12.0f) * color.g + 4.0f) * color.g : sqrt(color.g)) - color.g);
+ 429 | 		color.b = color.b > 1.0 ? color.b : color.b + glow.b * ((color.b <= 0.25f ? ((16.0f * color.b - 12.0f) * color.b + 4.0f) * color.b : sqrt(color.b)) - color.b);
+ 430 | 
+ 431 | 		return color;
+ 432 | 	} else { 
+ 433 | 		return glow;
+ 434 | 	}
+ 435 | }
+ 436 | 
+ 437 | #ifdef USE_1D_LUT
+ 438 | vec3 apply_color_correction(vec3 color) {
+ 439 | 	color.r = texture(source_color_correction, vec2(color.r, 0.0f)).r;
+ 440 | 	color.g = texture(source_color_correction, vec2(color.g, 0.0f)).g;
+ 441 | 	color.b = texture(source_color_correction, vec2(color.b, 0.0f)).b;
+ 442 | 	return color;
+ 443 | }
+ 444 | #else
+ 445 | vec3 apply_color_correction(vec3 color) {
+ 446 | 	return textureLod(source_color_correction, color, 0.0).rgb;
+ 447 | }
+ 448 | #endif
+ 449 | 
+ 450 | 
+ 451 | 
+ 452 | 
+ 453 | 
+ 454 | 
+ 455 | 
+ 456 | 
+ 457 | 
+ 458 | 
+ 459 | 
+ 460 | 
+ 461 | 
+ 462 | 
+ 463 | 
+ 464 | 
+ 465 | 
+ 466 | 
+ 467 | 
+ 468 | 
+ 469 | 
+ 470 | 
+ 471 | 
+ 472 | 
+ 473 | 
+ 474 | 
+ 475 | 
+ 476 | 
+ 477 | 
+ 478 | 
+ 479 | 
+ 480 | 
+ 481 | 
+ 482 | 
+ 483 | 
+ 484 | 
+ 485 | 
+ 486 | 
+ 487 | 
+ 488 | 
+ 489 | 
+ 490 | 
+ 491 | 
+ 492 | 
+ 493 | 
+ 494 | 
+ 495 | 
+ 496 | 
+ 497 | 
+ 498 | 
+ 499 | 
+ 500 | 
+ 501 | 
+ 502 | 
+ 503 | 
+ 504 | 
+ 505 | 
+ 506 | 
+ 507 | 
+ 508 | 
+ 509 | 
+ 510 | 
+ 511 | 
+ 512 | 
+ 513 | 
+ 514 | float QUALITY(float q) {
+ 515 | 	return (q < 5 ? 1.0 : (q > 5 ? (q < 10 ? 2.0 : (q < 11 ? 4.0 : 8.0)) : 1.5));
+ 516 | }
+ 517 | 
+ 518 | float rgb2luma(vec3 rgb) {
+ 519 | 	return sqrt(dot(rgb, vec3(0.299, 0.587, 0.114)));
+ 520 | }
+ 521 | 
+ 522 | vec3 do_fxaa(vec3 color, float exposure, vec2 uv_interp) {
+ 523 | 	const float EDGE_THRESHOLD_MIN = 0.0312;
+ 524 | 	const float EDGE_THRESHOLD_MAX = 0.125;
+ 525 | 	const int ITERATIONS = 12;
+ 526 | 	const float SUBPIXEL_QUALITY = 0.75;
+ 527 | 
+ 528 | #ifdef USE_MULTIVIEW
+ 529 | 	float lumaUp = rgb2luma(textureLodOffset(source_color, vec3(uv_interp, ViewIndex), 0.0, ivec2(0, 1)).xyz * exposure * params.luminance_multiplier);
+ 530 | 	float lumaDown = rgb2luma(textureLodOffset(source_color, vec3(uv_interp, ViewIndex), 0.0, ivec2(0, -1)).xyz * exposure * params.luminance_multiplier);
+ 531 | 	float lumaLeft = rgb2luma(textureLodOffset(source_color, vec3(uv_interp, ViewIndex), 0.0, ivec2(-1, 0)).xyz * exposure * params.luminance_multiplier);
+ 532 | 	float lumaRight = rgb2luma(textureLodOffset(source_color, vec3(uv_interp, ViewIndex), 0.0, ivec2(1, 0)).xyz * exposure * params.luminance_multiplier);
+ 533 | 
+ 534 | 	float lumaCenter = rgb2luma(color);
+ 535 | 
+ 536 | 	float lumaMin = min(lumaCenter, min(min(lumaUp, lumaDown), min(lumaLeft, lumaRight)));
+ 537 | 	float lumaMax = max(lumaCenter, max(max(lumaUp, lumaDown), max(lumaLeft, lumaRight)));
+ 538 | 
+ 539 | 	float lumaRange = lumaMax - lumaMin;
+ 540 | 
+ 541 | 	if (lumaRange < max(EDGE_THRESHOLD_MIN, lumaMax * EDGE_THRESHOLD_MAX)) {
+ 542 | 		return color;
+ 543 | 	}
+ 544 | 
+ 545 | 	float lumaDownLeft = rgb2luma(textureLodOffset(source_color, vec3(uv_interp, ViewIndex), 0.0, ivec2(-1, -1)).xyz * exposure * params.luminance_multiplier);
+ 546 | 	float lumaUpRight = rgb2luma(textureLodOffset(source_color, vec3(uv_interp, ViewIndex), 0.0, ivec2(1, 1)).xyz * exposure * params.luminance_multiplier);
+ 547 | 	float lumaUpLeft = rgb2luma(textureLodOffset(source_color, vec3(uv_interp, ViewIndex), 0.0, ivec2(-1, 1)).xyz * exposure * params.luminance_multiplier);
+ 548 | 	float lumaDownRight = rgb2luma(textureLodOffset(source_color, vec3(uv_interp, ViewIndex), 0.0, ivec2(1, -1)).xyz * exposure * params.luminance_multiplier);
+ 549 | 
+ 550 | 	float lumaDownUp = lumaDown + lumaUp;
+ 551 | 	float lumaLeftRight = lumaLeft + lumaRight;
+ 552 | 
+ 553 | 	float lumaLeftCorners = lumaDownLeft + lumaUpLeft;
+ 554 | 	float lumaDownCorners = lumaDownLeft + lumaDownRight;
+ 555 | 	float lumaRightCorners = lumaDownRight + lumaUpRight;
+ 556 | 	float lumaUpCorners = lumaUpRight + lumaUpLeft;
+ 557 | 
+ 558 | 	float edgeHorizontal = abs(-2.0 * lumaLeft + lumaLeftCorners) + abs(-2.0 * lumaCenter + lumaDownUp) * 2.0 + abs(-2.0 * lumaRight + lumaRightCorners);
+ 559 | 	float edgeVertical = abs(-2.0 * lumaUp + lumaUpCorners) + abs(-2.0 * lumaCenter + lumaLeftRight) * 2.0 + abs(-2.0 * lumaDown + lumaDownCorners);
+ 560 | 
+ 561 | 	bool isHorizontal = (edgeHorizontal >= edgeVertical);
+ 562 | 
+ 563 | 	float stepLength = isHorizontal ? params.pixel_size.y : params.pixel_size.x;
+ 564 | 
+ 565 | 	float luma1 = isHorizontal ? lumaDown : lumaLeft;
+ 566 | 	float luma2 = isHorizontal ? lumaUp : lumaRight;
+ 567 | 	float gradient1 = luma1 - lumaCenter;
+ 568 | 	float gradient2 = luma2 - lumaCenter;
+ 569 | 
+ 570 | 	bool is1Steepest = abs(gradient1) >= abs(gradient2);
+ 571 | 
+ 572 | 	float gradientScaled = 0.25 * max(abs(gradient1), abs(gradient2));
+ 573 | 
+ 574 | 	float lumaLocalAverage = 0.0;
+ 575 | 	if (is1Steepest) {
+ 576 | 		stepLength = -stepLength;
+ 577 | 		lumaLocalAverage = 0.5 * (luma1 + lumaCenter);
+ 578 | 	} else {
+ 579 | 		lumaLocalAverage = 0.5 * (luma2 + lumaCenter);
+ 580 | 	}
+ 581 | 
+ 582 | 	vec2 currentUv = uv_interp;
+ 583 | 	if (isHorizontal) {
+ 584 | 		currentUv.y += stepLength * 0.5;
+ 585 | 	} else {
+ 586 | 		currentUv.x += stepLength * 0.5;
+ 587 | 	}
+ 588 | 
+ 589 | 	vec2 offset = isHorizontal ? vec2(params.pixel_size.x, 0.0) : vec2(0.0, params.pixel_size.y);
+ 590 | 	vec3 uv1 = vec3(currentUv - offset * QUALITY(0), ViewIndex);
+ 591 | 	vec3 uv2 = vec3(currentUv + offset * QUALITY(0), ViewIndex);
+ 592 | 
+ 593 | 	float lumaEnd1 = rgb2luma(textureLod(source_color, uv1, 0.0).xyz * exposure * params.luminance_multiplier);
+ 594 | 	float lumaEnd2 = rgb2luma(textureLod(source_color, uv2, 0.0).xyz * exposure * params.luminance_multiplier);
+ 595 | 	lumaEnd1 -= lumaLocalAverage;
+ 596 | 	lumaEnd2 -= lumaLocalAverage;
+ 597 | 
+ 598 | 	bool reached1 = abs(lumaEnd1) >= gradientScaled;
+ 599 | 	bool reached2 = abs(lumaEnd2) >= gradientScaled;
+ 600 | 	bool reachedBoth = reached1 && reached2;
+ 601 | 
+ 602 | 	if (!reached1) {
+ 603 | 		uv1 -= vec3(offset * QUALITY(1), 0.0);
+ 604 | 	}
+ 605 | 	if (!reached2) {
+ 606 | 		uv2 += vec3(offset * QUALITY(1), 0.0);
+ 607 | 	}
+ 608 | 
+ 609 | 	if (!reachedBoth) {
+ 610 | 		for (int i = 2; i < ITERATIONS; i++) {
+ 611 | 			if (!reached1) {
+ 612 | 				lumaEnd1 = rgb2luma(textureLod(source_color, uv1, 0.0).xyz * exposure * params.luminance_multiplier);
+ 613 | 				lumaEnd1 = lumaEnd1 - lumaLocalAverage;
+ 614 | 			}
+ 615 | 			if (!reached2) {
+ 616 | 				lumaEnd2 = rgb2luma(textureLod(source_color, uv2, 0.0).xyz * exposure * params.luminance_multiplier);
+ 617 | 				lumaEnd2 = lumaEnd2 - lumaLocalAverage;
+ 618 | 			}
+ 619 | 			reached1 = abs(lumaEnd1) >= gradientScaled;
+ 620 | 			reached2 = abs(lumaEnd2) >= gradientScaled;
+ 621 | 			reachedBoth = reached1 && reached2;
+ 622 | 			if (!reached1) {
+ 623 | 				uv1 -= vec3(offset * QUALITY(i), 0.0);
+ 624 | 			}
+ 625 | 			if (!reached2) {
+ 626 | 				uv2 += vec3(offset * QUALITY(i), 0.0);
+ 627 | 			}
+ 628 | 			if (reachedBoth) {
+ 629 | 				break;
+ 630 | 			}
+ 631 | 		}
+ 632 | 	}
+ 633 | 
+ 634 | 	float distance1 = isHorizontal ? (uv_interp.x - uv1.x) : (uv_interp.y - uv1.y);
+ 635 | 	float distance2 = isHorizontal ? (uv2.x - uv_interp.x) : (uv2.y - uv_interp.y);
+ 636 | 
+ 637 | 	bool isDirection1 = distance1 < distance2;
+ 638 | 	float distanceFinal = min(distance1, distance2);
+ 639 | 
+ 640 | 	float edgeThickness = (distance1 + distance2);
+ 641 | 
+ 642 | 	bool isLumaCenterSmaller = lumaCenter < lumaLocalAverage;
+ 643 | 
+ 644 | 	bool correctVariation1 = (lumaEnd1 < 0.0) != isLumaCenterSmaller;
+ 645 | 	bool correctVariation2 = (lumaEnd2 < 0.0) != isLumaCenterSmaller;
+ 646 | 
+ 647 | 	bool correctVariation = isDirection1 ? correctVariation1 : correctVariation2;
+ 648 | 
+ 649 | 	float pixelOffset = -distanceFinal / edgeThickness + 0.5;
+ 650 | 
+ 651 | 	float finalOffset = correctVariation ? pixelOffset : 0.0;
+ 652 | 
+ 653 | 	float lumaAverage = (1.0 / 12.0) * (2.0 * (lumaDownUp + lumaLeftRight) + lumaLeftCorners + lumaRightCorners);
+ 654 | 
+ 655 | 	float subPixelOffset1 = clamp(abs(lumaAverage - lumaCenter) / lumaRange, 0.0, 1.0);
+ 656 | 	float subPixelOffset2 = (-2.0 * subPixelOffset1 + 3.0) * subPixelOffset1 * subPixelOffset1;
+ 657 | 
+ 658 | 	float subPixelOffsetFinal = subPixelOffset2 * subPixelOffset2 * SUBPIXEL_QUALITY;
+ 659 | 
+ 660 | 	finalOffset = max(finalOffset, subPixelOffsetFinal);
+ 661 | 
+ 662 | 	vec3 finalUv = vec3(uv_interp, ViewIndex);
+ 663 | 	if (isHorizontal) {
+ 664 | 		finalUv.y += finalOffset * stepLength;
+ 665 | 	} else {
+ 666 | 		finalUv.x += finalOffset * stepLength;
+ 667 | 	}
+ 668 | 
+ 669 | 	vec3 finalColor = textureLod(source_color, finalUv, 0.0).xyz * exposure * params.luminance_multiplier;
+ 670 | 	return finalColor;
+ 671 | 
+ 672 | #else
+ 673 | 	float lumaUp = rgb2luma(textureLodOffset(source_color, uv_interp, 0.0, ivec2(0, 1)).xyz * exposure * params.luminance_multiplier);
+ 674 | 	float lumaDown = rgb2luma(textureLodOffset(source_color, uv_interp, 0.0, ivec2(0, -1)).xyz * exposure * params.luminance_multiplier);
+ 675 | 	float lumaLeft = rgb2luma(textureLodOffset(source_color, uv_interp, 0.0, ivec2(-1, 0)).xyz * exposure * params.luminance_multiplier);
+ 676 | 	float lumaRight = rgb2luma(textureLodOffset(source_color, uv_interp, 0.0, ivec2(1, 0)).xyz * exposure * params.luminance_multiplier);
+ 677 | 
+ 678 | 	float lumaCenter = rgb2luma(color);
+ 679 | 
+ 680 | 	float lumaMin = min(lumaCenter, min(min(lumaUp, lumaDown), min(lumaLeft, lumaRight)));
+ 681 | 	float lumaMax = max(lumaCenter, max(max(lumaUp, lumaDown), max(lumaLeft, lumaRight)));
+ 682 | 
+ 683 | 	float lumaRange = lumaMax - lumaMin;
+ 684 | 
+ 685 | 	if (lumaRange < max(EDGE_THRESHOLD_MIN, lumaMax * EDGE_THRESHOLD_MAX)) {
+ 686 | 		return color;
+ 687 | 	}
+ 688 | 
+ 689 | 	float lumaDownLeft = rgb2luma(textureLodOffset(source_color, uv_interp, 0.0, ivec2(-1, -1)).xyz * exposure * params.luminance_multiplier);
+ 690 | 	float lumaUpRight = rgb2luma(textureLodOffset(source_color, uv_interp, 0.0, ivec2(1, 1)).xyz * exposure * params.luminance_multiplier);
+ 691 | 	float lumaUpLeft = rgb2luma(textureLodOffset(source_color, uv_interp, 0.0, ivec2(-1, 1)).xyz * exposure * params.luminance_multiplier);
+ 692 | 	float lumaDownRight = rgb2luma(textureLodOffset(source_color, uv_interp, 0.0, ivec2(1, -1)).xyz * exposure * params.luminance_multiplier);
+ 693 | 
+ 694 | 	float lumaDownUp = lumaDown + lumaUp;
+ 695 | 	float lumaLeftRight = lumaLeft + lumaRight;
+ 696 | 
+ 697 | 	float lumaLeftCorners = lumaDownLeft + lumaUpLeft;
+ 698 | 	float lumaDownCorners = lumaDownLeft + lumaDownRight;
+ 699 | 	float lumaRightCorners = lumaDownRight + lumaUpRight;
+ 700 | 	float lumaUpCorners = lumaUpRight + lumaUpLeft;
+ 701 | 
+ 702 | 	float edgeHorizontal = abs(-2.0 * lumaLeft + lumaLeftCorners) + abs(-2.0 * lumaCenter + lumaDownUp) * 2.0 + abs(-2.0 * lumaRight + lumaRightCorners);
+ 703 | 	float edgeVertical = abs(-2.0 * lumaUp + lumaUpCorners) + abs(-2.0 * lumaCenter + lumaLeftRight) * 2.0 + abs(-2.0 * lumaDown + lumaDownCorners);
+ 704 | 
+ 705 | 	bool isHorizontal = (edgeHorizontal >= edgeVertical);
+ 706 | 
+ 707 | 	float stepLength = isHorizontal ? params.pixel_size.y : params.pixel_size.x;
+ 708 | 
+ 709 | 	float luma1 = isHorizontal ? lumaDown : lumaLeft;
+ 710 | 	float luma2 = isHorizontal ? lumaUp : lumaRight;
+ 711 | 	float gradient1 = luma1 - lumaCenter;
+ 712 | 	float gradient2 = luma2 - lumaCenter;
+ 713 | 
+ 714 | 	bool is1Steepest = abs(gradient1) >= abs(gradient2);
+ 715 | 
+ 716 | 	float gradientScaled = 0.25 * max(abs(gradient1), abs(gradient2));
+ 717 | 
+ 718 | 	float lumaLocalAverage = 0.0;
+ 719 | 	if (is1Steepest) {
+ 720 | 		stepLength = -stepLength;
+ 721 | 		lumaLocalAverage = 0.5 * (luma1 + lumaCenter);
+ 722 | 	} else {
+ 723 | 		lumaLocalAverage = 0.5 * (luma2 + lumaCenter);
+ 724 | 	}
+ 725 | 
+ 726 | 	vec2 currentUv = uv_interp;
+ 727 | 	if (isHorizontal) {
+ 728 | 		currentUv.y += stepLength * 0.5;
+ 729 | 	} else {
+ 730 | 		currentUv.x += stepLength * 0.5;
+ 731 | 	}
+ 732 | 
+ 733 | 	vec2 offset = isHorizontal ? vec2(params.pixel_size.x, 0.0) : vec2(0.0, params.pixel_size.y);
+ 734 | 	vec2 uv1 = currentUv - offset * QUALITY(0);
+ 735 | 	vec2 uv2 = currentUv + offset * QUALITY(0);
+ 736 | 
+ 737 | 	float lumaEnd1 = rgb2luma(textureLod(source_color, uv1, 0.0).xyz * exposure * params.luminance_multiplier);
+ 738 | 	float lumaEnd2 = rgb2luma(textureLod(source_color, uv2, 0.0).xyz * exposure * params.luminance_multiplier);
+ 739 | 	lumaEnd1 -= lumaLocalAverage;
+ 740 | 	lumaEnd2 -= lumaLocalAverage;
+ 741 | 
+ 742 | 	bool reached1 = abs(lumaEnd1) >= gradientScaled;
+ 743 | 	bool reached2 = abs(lumaEnd2) >= gradientScaled;
+ 744 | 	bool reachedBoth = reached1 && reached2;
+ 745 | 
+ 746 | 	if (!reached1) {
+ 747 | 		uv1 -= offset * QUALITY(1);
+ 748 | 	}
+ 749 | 	if (!reached2) {
+ 750 | 		uv2 += offset * QUALITY(1);
+ 751 | 	}
+ 752 | 
+ 753 | 	if (!reachedBoth) {
+ 754 | 		for (int i = 2; i < ITERATIONS; i++) {
+ 755 | 			if (!reached1) {
+ 756 | 				lumaEnd1 = rgb2luma(textureLod(source_color, uv1, 0.0).xyz * exposure * params.luminance_multiplier);
+ 757 | 				lumaEnd1 = lumaEnd1 - lumaLocalAverage;
+ 758 | 			}
+ 759 | 			if (!reached2) {
+ 760 | 				lumaEnd2 = rgb2luma(textureLod(source_color, uv2, 0.0).xyz * exposure * params.luminance_multiplier);
+ 761 | 				lumaEnd2 = lumaEnd2 - lumaLocalAverage;
+ 762 | 			}
+ 763 | 			reached1 = abs(lumaEnd1) >= gradientScaled;
+ 764 | 			reached2 = abs(lumaEnd2) >= gradientScaled;
+ 765 | 			reachedBoth = reached1 && reached2;
+ 766 | 			if (!reached1) {
+ 767 | 				uv1 -= offset * QUALITY(i);
+ 768 | 			}
+ 769 | 			if (!reached2) {
+ 770 | 				uv2 += offset * QUALITY(i);
+ 771 | 			}
+ 772 | 			if (reachedBoth) {
+ 773 | 				break;
+ 774 | 			}
+ 775 | 		}
+ 776 | 	}
+ 777 | 
+ 778 | 	float distance1 = isHorizontal ? (uv_interp.x - uv1.x) : (uv_interp.y - uv1.y);
+ 779 | 	float distance2 = isHorizontal ? (uv2.x - uv_interp.x) : (uv2.y - uv_interp.y);
+ 780 | 
+ 781 | 	bool isDirection1 = distance1 < distance2;
+ 782 | 	float distanceFinal = min(distance1, distance2);
+ 783 | 
+ 784 | 	float edgeThickness = (distance1 + distance2);
+ 785 | 
+ 786 | 	bool isLumaCenterSmaller = lumaCenter < lumaLocalAverage;
+ 787 | 
+ 788 | 	bool correctVariation1 = (lumaEnd1 < 0.0) != isLumaCenterSmaller;
+ 789 | 	bool correctVariation2 = (lumaEnd2 < 0.0) != isLumaCenterSmaller;
+ 790 | 
+ 791 | 	bool correctVariation = isDirection1 ? correctVariation1 : correctVariation2;
+ 792 | 
+ 793 | 	float pixelOffset = -distanceFinal / edgeThickness + 0.5;
+ 794 | 
+ 795 | 	float finalOffset = correctVariation ? pixelOffset : 0.0;
+ 796 | 
+ 797 | 	float lumaAverage = (1.0 / 12.0) * (2.0 * (lumaDownUp + lumaLeftRight) + lumaLeftCorners + lumaRightCorners);
+ 798 | 
+ 799 | 	float subPixelOffset1 = clamp(abs(lumaAverage - lumaCenter) / lumaRange, 0.0, 1.0);
+ 800 | 	float subPixelOffset2 = (-2.0 * subPixelOffset1 + 3.0) * subPixelOffset1 * subPixelOffset1;
+ 801 | 
+ 802 | 	float subPixelOffsetFinal = subPixelOffset2 * subPixelOffset2 * SUBPIXEL_QUALITY;
+ 803 | 
+ 804 | 	finalOffset = max(finalOffset, subPixelOffsetFinal);
+ 805 | 
+ 806 | 	vec2 finalUv = uv_interp;
+ 807 | 	if (isHorizontal) {
+ 808 | 		finalUv.y += finalOffset * stepLength;
+ 809 | 	} else {
+ 810 | 		finalUv.x += finalOffset * stepLength;
+ 811 | 	}
+ 812 | 
+ 813 | 	vec3 finalColor = textureLod(source_color, finalUv, 0.0).xyz * exposure * params.luminance_multiplier;
+ 814 | 	return finalColor;
+ 815 | 
+ 816 | #endif
+ 817 | }
+ 818 | 
+ 819 | 
+ 820 | 
+ 821 | 
+ 822 | 
+ 823 | 
+ 824 | vec3 screen_space_dither(vec2 frag_coord, float bit_alignment_diviser) {
+ 825 | 	
+ 826 | 	
+ 827 | 	vec3 dither = vec3(dot(vec2(171.0, 231.0), frag_coord));
+ 828 | 	dither.rgb = fract(dither.rgb / vec3(103.0, 71.0, 97.0));
+ 829 | 
+ 830 | 	
+ 831 | 	
+ 832 | 	return (dither.rgb - 0.5) / bit_alignment_diviser;
+ 833 | }
+ 834 | 
+ 835 | void main() {
+ 836 | #ifdef USE_MULTIVIEW
+ 837 | 	vec4 color = textureLod(source_color, vec3(uv_interp, ViewIndex), 0.0f);
+ 838 | #else
+ 839 | 	vec4 color = textureLod(source_color, uv_interp, 0.0f);
+ 840 | #endif
+ 841 | 	color.rgb *= params.luminance_multiplier;
+ 842 | 
+ 843 | 	
+ 844 | 
+ 845 | 	float exposure = params.exposure;
+ 846 | 
+ 847 | 	if (bool(params.flags & FLAG_USE_AUTO_EXPOSURE)) {
+ 848 | 		exposure *= 1.0 / (texelFetch(source_auto_exposure, ivec2(0, 0), 0).r * params.luminance_multiplier / params.auto_exposure_scale);
+ 849 | 	}
+ 850 | 
+ 851 | 	color.rgb *= exposure;
+ 852 | 
+ 853 | 	
+ 854 | 	if (bool(params.flags & FLAG_USE_FXAA)) {
+ 855 | 		
+ 856 | 		color.rgb = do_fxaa(color.rgb, exposure, uv_interp);
+ 857 | 	}
+ 858 | 
+ 859 | 	if (bool(params.flags & FLAG_USE_GLOW) && params.glow_mode != GLOW_MODE_SOFTLIGHT) {
+ 860 | 		vec3 glow = gather_glow(source_glow, uv_interp) * params.glow_intensity;
+ 861 | 		if (params.glow_map_strength > 0.001) {
+ 862 | 			glow = mix(glow, texture(glow_map, uv_interp).rgb * glow, params.glow_map_strength);
+ 863 | 		}
+ 864 | 
+ 865 | 		if (params.glow_mode == GLOW_MODE_MIX) {
+ 866 | 			color.rgb = color.rgb * (1.0 - params.glow_intensity) + glow;
+ 867 | 		} else {
+ 868 | 			color.rgb = apply_glow(color.rgb, glow, params.white);
+ 869 | 		}
+ 870 | 	}
+ 871 | 
+ 872 | 	
+ 873 | 
+ 874 | 	color.rgb = apply_tonemapping(color.rgb);
+ 875 | 
+ 876 | 	
+ 877 | 
+ 878 | 	if (bool(params.flags & FLAG_USE_GLOW) && params.glow_mode == GLOW_MODE_SOFTLIGHT) {
+ 879 | 		
+ 880 | 		
+ 881 | 		
+ 882 | 		vec3 glow = gather_glow(source_glow, uv_interp) * params.glow_intensity;
+ 883 | 		if (params.glow_map_strength > 0.001) {
+ 884 | 			glow = mix(glow, texture(glow_map, uv_interp).rgb * glow, params.glow_map_strength);
+ 885 | 		}
+ 886 | 		glow = apply_tonemapping(glow);
+ 887 | 		color.rgb = apply_glow(color.rgb, glow, params.white);
+ 888 | 	}
+ 889 | 
+ 890 | 	
+ 891 | 
+ 892 | 	if (bool(params.flags & FLAG_USE_BCS)) {
+ 893 | 		
+ 894 | 		
+ 895 | 		
+ 896 | 		
+ 897 | 		color.rgb = color.rgb * params.bcs.x;
+ 898 | 
+ 899 | 		color.rgb = linear_to_srgb(color.rgb);
+ 900 | 
+ 901 | 		
+ 902 | 		
+ 903 | 		
+ 904 | 		
+ 905 | 		
+ 906 | 		color.rgb = mix(vec3(0.5), color.rgb, params.bcs.y);
+ 907 | 
+ 908 | 		
+ 909 | 		
+ 910 | 		
+ 911 | 		
+ 912 | 		color.rgb = mix(vec3(dot(vec3(1.0), color.rgb) * (1.0 / 3.0)), color.rgb, params.bcs.z);
+ 913 | 
+ 914 | 		if (bool(params.flags & FLAG_USE_COLOR_CORRECTION)) {
+ 915 | 			color.rgb = clamp(color.rgb, vec3(0.0), vec3(1.0));
+ 916 | 			color.rgb = apply_color_correction(color.rgb);
+ 917 | 			
+ 918 | 			
+ 919 | 			
+ 920 | 		} else if (!bool(params.flags & FLAG_CONVERT_TO_SRGB)) {
+ 921 | 			color.rgb = srgb_to_linear(color.rgb);
+ 922 | 		}
+ 923 | 	} else if (bool(params.flags & FLAG_CONVERT_TO_SRGB)) {
+ 924 | 		color.rgb = linear_to_srgb(color.rgb);
+ 925 | 	}
+ 926 | 
+ 927 | 	
+ 928 | 	
+ 929 | 
+ 930 | 	if (bool(params.flags & FLAG_USE_8_BIT_DEBANDING)) {
+ 931 | 		
+ 932 | 		color.rgb += screen_space_dither(gl_FragCoord.xy, 255.0);
+ 933 | 	}
+ 934 | 
+ 935 | 	frag_color = color;
+ 936 | }
+ 937 | 
+ 938 | 
+   at: compile_stages (servers/rendering/renderer_rd/shader_rd.cpp:1184)
+ERROR: Condition "variant_stages.is_empty()" is true.
+   at: _compile_variant (servers/rendering/renderer_rd/shader_rd.cpp:414)
+ERROR: code:
+   1 | 
+   2 | #version 450
+   3 | 
+   4 | 
+   5 | 
+   6 | #define USE_GLOW_FILTER_BICUBIC
+   7 | #define USE_1D_LUT
+   8 | 
+   9 | #define RENDER_DRIVER_METAL
+  10 | #define samplerExternalOES sampler2D
+  11 | #define textureExternalOES texture2D
+  12 | 
+  13 | #ifdef USE_MULTIVIEW
+  14 | #extension GL_EXT_multiview : enable
+  15 | #define ViewIndex gl_ViewIndex
+  16 | #endif 
+  17 | 
+  18 | layout(location = 0) in vec2 uv_interp;
+  19 | 
+  20 | #ifdef USE_MULTIVIEW
+  21 | #define SAMPLER_FORMAT sampler2DArray
+  22 | #else
+  23 | #define SAMPLER_FORMAT sampler2D
+  24 | #endif
+  25 | 
+  26 | layout(set = 0, binding = 0) uniform SAMPLER_FORMAT source_color;
+  27 | layout(set = 1, binding = 0) uniform sampler2D source_auto_exposure;
+  28 | layout(set = 2, binding = 0) uniform SAMPLER_FORMAT source_glow;
+  29 | layout(set = 2, binding = 1) uniform sampler2D glow_map; 
+  30 | 
+  31 | #ifdef USE_1D_LUT
+  32 | layout(set = 3, binding = 0) uniform sampler2D source_color_correction;
+  33 | #else
+  34 | layout(set = 3, binding = 0) uniform sampler3D source_color_correction;
+  35 | #endif
+  36 | 
+  37 | #define FLAG_USE_BCS (1 << 0)
+  38 | #define FLAG_USE_GLOW (1 << 1)
+  39 | #define FLAG_USE_AUTO_EXPOSURE (1 << 2)
+  40 | #define FLAG_USE_COLOR_CORRECTION (1 << 3)
+  41 | #define FLAG_USE_FXAA (1 << 4)
+  42 | #define FLAG_USE_8_BIT_DEBANDING (1 << 5)
+  43 | #define FLAG_CONVERT_TO_SRGB (1 << 6)
+  44 | 
+  45 | layout(push_constant, std430) uniform Params {
+  46 | 	vec3 bcs;
+  47 | 	uint flags;
+  48 | 
+  49 | 	vec2 pixel_size;
+  50 | 	uint tonemapper;
+  51 | 	float output_max_value;
+  52 | 
+  53 | 	uvec2 glow_texture_size;
+  54 | 	float glow_intensity;
+  55 | 	float glow_map_strength;
+  56 | 
+  57 | 	uint glow_mode;
+  58 | 	float glow_levels[7];
+  59 | 
+  60 | 	float exposure;
+  61 | 	float white;
+  62 | 	float auto_exposure_scale;
+  63 | 	float luminance_multiplier;
+  64 | 
+  65 | 	vec4 tonemapper_params;
+  66 | }
+  67 | params;
+  68 | 
+  69 | layout(location = 0) out vec4 frag_color;
+  70 | 
+  71 | 
+  72 | vec3 tonemap_reinhard(vec3 color) {
+  73 | 	float white_squared = params.tonemapper_params.x;
+  74 | 	
+  75 | 	return color * (1.0f + color / white_squared) / (1.0f + color / params.output_max_value);
+  76 | }
+  77 | 
+  78 | vec3 tonemap_filmic(vec3 color) {
+  79 | 	
+  80 | 	
+  81 | 	
+  82 | 	
+  83 | 	const float exposure_bias = 2.0f;
+  84 | 	const float A = 0.22f * exposure_bias * exposure_bias; 
+  85 | 	const float B = 0.30f * exposure_bias;
+  86 | 	const float C = 0.10f;
+  87 | 	const float D = 0.20f;
+  88 | 	const float E = 0.01f;
+  89 | 	const float F = 0.30f;
+  90 | 
+  91 | 	vec3 color_tonemapped = ((color * (A * color + C * B) + D * E) / (color * (A * color + B) + D * F)) - E / F;
+  92 | 
+  93 | 	return color_tonemapped / params.tonemapper_params.x;
+  94 | }
+  95 | 
+  96 | 
+  97 | 
+  98 | vec3 tonemap_aces(vec3 color) {
+  99 | 	
+ 100 | 	const float exposure_bias = 1.8f;
+ 101 | 	const float A = 0.0245786f;
+ 102 | 	const float B = 0.000090537f;
+ 103 | 	const float C = 0.983729f;
+ 104 | 	const float D = 0.432951f;
+ 105 | 	const float E = 0.238081f;
+ 106 | 
+ 107 | 	
+ 108 | 	const mat3 rgb_to_rrt = mat3(
+ 109 | 			vec3(0.59719f * exposure_bias, 0.35458f * exposure_bias, 0.04823f * exposure_bias),
+ 110 | 			vec3(0.07600f * exposure_bias, 0.90834f * exposure_bias, 0.01566f * exposure_bias),
+ 111 | 			vec3(0.02840f * exposure_bias, 0.13383f * exposure_bias, 0.83777f * exposure_bias));
+ 112 | 
+ 113 | 	const mat3 odt_to_rgb = mat3(
+ 114 | 			vec3(1.60475f, -0.53108f, -0.07367f),
+ 115 | 			vec3(-0.10208f, 1.10813f, -0.00605f),
+ 116 | 			vec3(-0.00327f, -0.07276f, 1.07602f));
+ 117 | 
+ 118 | 	color *= rgb_to_rrt;
+ 119 | 	vec3 color_tonemapped = (color * (color + A) - B) / (color * (C * color + D) + E);
+ 120 | 	color_tonemapped *= odt_to_rgb;
+ 121 | 
+ 122 | 	return color_tonemapped / params.tonemapper_params.x;
+ 123 | }
+ 124 | 
+ 125 | 
+ 126 | 
+ 127 | 
+ 128 | vec3 allenwp_curve(vec3 x) {
+ 129 | 	
+ 130 | 	
+ 131 | 	const float awp_crossover_point = 0.18;
+ 132 | 	
+ 133 | 	
+ 134 | 	const float awp_shoulder_max = params.output_max_value - awp_crossover_point;
+ 135 | 
+ 136 | 	float awp_contrast = params.tonemapper_params.x;
+ 137 | 	float awp_toe_a = params.tonemapper_params.y;
+ 138 | 	float awp_slope = params.tonemapper_params.z;
+ 139 | 	float awp_w = params.tonemapper_params.w;
+ 140 | 
+ 141 | 	
+ 142 | 	vec3 s = x - awp_crossover_point;
+ 143 | 	vec3 slope_s = awp_slope * s;
+ 144 | 	s = slope_s * (1.0 + s / awp_w) / (1.0 + (slope_s / awp_shoulder_max));
+ 145 | 	s += awp_crossover_point;
+ 146 | 
+ 147 | 	
+ 148 | 	vec3 t = pow(x, vec3(awp_contrast));
+ 149 | 	t = t / (t + awp_toe_a);
+ 150 | 
+ 151 | 	return mix(s, t, lessThan(x, vec3(awp_crossover_point)));
+ 152 | }
+ 153 | 
+ 154 | 
+ 155 | 
+ 156 | 
+ 157 | 
+ 158 | vec3 tonemap_agx(vec3 color) {
+ 159 | 	
+ 160 | 	
+ 161 | 	
+ 162 | 	
+ 163 | 	
+ 164 | 	
+ 165 | 	
+ 166 | 	
+ 167 | 	
+ 168 | 	
+ 169 | 	
+ 170 | 	
+ 171 | 	
+ 172 | 	
+ 173 | 	
+ 174 | 	
+ 175 | 	
+ 176 | 
+ 177 | 	
+ 178 | 	const mat3 rec709_to_rec2020_agx_inset_matrix = mat3(
+ 179 | 			0.544814746488245, 0.140416948464053, 0.0888104196149096,
+ 180 | 			0.373787398372697, 0.754137554567394, 0.178871756420858,
+ 181 | 			0.0813978551390581, 0.105445496968552, 0.732317823964232);
+ 182 | 
+ 183 | 	
+ 184 | 	const mat3 agx_outset_rec2020_to_rec709_matrix = mat3(
+ 185 | 			1.96488741169489, -0.299313364904742, -0.164352742528393,
+ 186 | 			-0.855988495690215, 1.32639796461980, -0.238183969428088,
+ 187 | 			-0.108898916004672, -0.0270845997150571, 1.40253671195648);
+ 188 | 
+ 189 | 	
+ 190 | 	color = rec709_to_rec2020_agx_inset_matrix * color;
+ 191 | 
+ 192 | 	
+ 193 | 	
+ 194 | 	color = allenwp_curve(color);
+ 195 | 
+ 196 | 	
+ 197 | 	
+ 198 | 	color = min(vec3(params.output_max_value), color);
+ 199 | 
+ 200 | 	
+ 201 | 	color = agx_outset_rec2020_to_rec709_matrix * color;
+ 202 | 
+ 203 | 	
+ 204 | 	
+ 205 | 	
+ 206 | 	return color;
+ 207 | }
+ 208 | 
+ 209 | vec3 linear_to_srgb(vec3 color) {
+ 210 | 	const vec3 a = vec3(0.055f);
+ 211 | 	return mix((vec3(1.0f) + a) * pow(color.rgb, vec3(1.0f / 2.4f)) - a, 12.92f * color.rgb, lessThan(color.rgb, vec3(0.0031308f)));
+ 212 | }
+ 213 | 
+ 214 | vec3 srgb_to_linear(vec3 color) {
+ 215 | 	const vec3 a = vec3(0.055f);
+ 216 | 	return mix(pow((color.rgb + a) * (1.0f / (vec3(1.0f) + a)), vec3(2.4f)), color.rgb * (1.0f / 12.92f), lessThan(color.rgb, vec3(0.04045f)));
+ 217 | }
+ 218 | 
+ 219 | #define TONEMAPPER_LINEAR 0
+ 220 | #define TONEMAPPER_REINHARD 1
+ 221 | #define TONEMAPPER_FILMIC 2
+ 222 | #define TONEMAPPER_ACES 3
+ 223 | #define TONEMAPPER_AGX 4
+ 224 | #define TONEMAPPER_GT7 5
+ 225 | 
+ 226 | vec3 apply_tonemapping(vec3 color) { 
+ 227 | 	if (params.tonemapper == TONEMAPPER_LINEAR) {
+ 228 | 		return color;
+ 229 | 	}
+ 230 | 
+ 231 | 	
+ 232 | 	
+ 233 | 	color = max(vec3(0.0), color);
+ 234 | 
+ 235 | 	if (params.tonemapper == TONEMAPPER_REINHARD) {
+ 236 | 		return tonemap_reinhard(color);
+ 237 | 	} else if (params.tonemapper == TONEMAPPER_FILMIC) {
+ 238 | 		return tonemap_filmic(color);
+ 239 | 	} else if (params.tonemapper == TONEMAPPER_ACES) {
+ 240 | 		return tonemap_aces(color);
+ 241 | 	} else if (params.tonemapper == TONEMAPPER_AGX) {
+ 242 | 		return tonemap_agx(color);
+ 243 | 	} else { 
+ 244 | 		return tonemap_gt7(color);
+ 245 | 	}
+ 246 | }
+ 247 | 
+ 248 | #ifdef USE_GLOW_FILTER_BICUBIC
+ 249 | 
+ 250 | float w0(float a) {
+ 251 | 	return (1.0f / 6.0f) * (a * (a * (-a + 3.0f) - 3.0f) + 1.0f);
+ 252 | }
+ 253 | 
+ 254 | float w1(float a) {
+ 255 | 	return (1.0f / 6.0f) * (a * a * (3.0f * a - 6.0f) + 4.0f);
+ 256 | }
+ 257 | 
+ 258 | float w2(float a) {
+ 259 | 	return (1.0f / 6.0f) * (a * (a * (-3.0f * a + 3.0f) + 3.0f) + 1.0f);
+ 260 | }
+ 261 | 
+ 262 | float w3(float a) {
+ 263 | 	return (1.0f / 6.0f) * (a * a * a);
+ 264 | }
+ 265 | 
+ 266 | 
+ 267 | float g0(float a) {
+ 268 | 	return w0(a) + w1(a);
+ 269 | }
+ 270 | 
+ 271 | float g1(float a) {
+ 272 | 	return w2(a) + w3(a);
+ 273 | }
+ 274 | 
+ 275 | 
+ 276 | float h0(float a) {
+ 277 | 	return -1.0f + w1(a) / (w0(a) + w1(a));
+ 278 | }
+ 279 | 
+ 280 | float h1(float a) {
+ 281 | 	return 1.0f + w3(a) / (w2(a) + w3(a));
+ 282 | }
+ 283 | 
+ 284 | #ifdef USE_MULTIVIEW
+ 285 | vec4 texture2D_bicubic(sampler2DArray tex, vec2 uv, int p_lod) {
+ 286 | 	float lod = float(p_lod);
+ 287 | 	vec2 tex_size = vec2(params.glow_texture_size >> p_lod);
+ 288 | 	vec2 pixel_size = vec2(1.0f) / tex_size;
+ 289 | 
+ 290 | 	uv = uv * tex_size + vec2(0.5f);
+ 291 | 
+ 292 | 	vec2 iuv = floor(uv);
+ 293 | 	vec2 fuv = fract(uv);
+ 294 | 
+ 295 | 	float g0x = g0(fuv.x);
+ 296 | 	float g1x = g1(fuv.x);
+ 297 | 	float h0x = h0(fuv.x);
+ 298 | 	float h1x = h1(fuv.x);
+ 299 | 	float h0y = h0(fuv.y);
+ 300 | 	float h1y = h1(fuv.y);
+ 301 | 
+ 302 | 	vec3 p0 = vec3((vec2(iuv.x + h0x, iuv.y + h0y) - vec2(0.5f)) * pixel_size, ViewIndex);
+ 303 | 	vec3 p1 = vec3((vec2(iuv.x + h1x, iuv.y + h0y) - vec2(0.5f)) * pixel_size, ViewIndex);
+ 304 | 	vec3 p2 = vec3((vec2(iuv.x + h0x, iuv.y + h1y) - vec2(0.5f)) * pixel_size, ViewIndex);
+ 305 | 	vec3 p3 = vec3((vec2(iuv.x + h1x, iuv.y + h1y) - vec2(0.5f)) * pixel_size, ViewIndex);
+ 306 | 
+ 307 | 	return (g0(fuv.y) * (g0x * textureLod(tex, p0, lod) + g1x * textureLod(tex, p1, lod))) +
+ 308 | 			(g1(fuv.y) * (g0x * textureLod(tex, p2, lod) + g1x * textureLod(tex, p3, lod)));
+ 309 | }
+ 310 | 
+ 311 | #define GLOW_TEXTURE_SAMPLE(m_tex, m_uv, m_lod) texture2D_bicubic(m_tex, m_uv, m_lod)
+ 312 | #else 
+ 313 | 
+ 314 | vec4 texture2D_bicubic(sampler2D tex, vec2 uv, int p_lod) {
+ 315 | 	float lod = float(p_lod);
+ 316 | 	vec2 tex_size = vec2(params.glow_texture_size >> p_lod);
+ 317 | 	vec2 pixel_size = vec2(1.0f) / tex_size;
+ 318 | 
+ 319 | 	uv = uv * tex_size + vec2(0.5f);
+ 320 | 
+ 321 | 	vec2 iuv = floor(uv);
+ 322 | 	vec2 fuv = fract(uv);
+ 323 | 
+ 324 | 	float g0x = g0(fuv.x);
+ 325 | 	float g1x = g1(fuv.x);
+ 326 | 	float h0x = h0(fuv.x);
+ 327 | 	float h1x = h1(fuv.x);
+ 328 | 	float h0y = h0(fuv.y);
+ 329 | 	float h1y = h1(fuv.y);
+ 330 | 
+ 331 | 	vec2 p0 = (vec2(iuv.x + h0x, iuv.y + h0y) - vec2(0.5f)) * pixel_size;
+ 332 | 	vec2 p1 = (vec2(iuv.x + h1x, iuv.y + h0y) - vec2(0.5f)) * pixel_size;
+ 333 | 	vec2 p2 = (vec2(iuv.x + h0x, iuv.y + h1y) - vec2(0.5f)) * pixel_size;
+ 334 | 	vec2 p3 = (vec2(iuv.x + h1x, iuv.y + h1y) - vec2(0.5f)) * pixel_size;
+ 335 | 
+ 336 | 	return (g0(fuv.y) * (g0x * textureLod(tex, p0, lod) + g1x * textureLod(tex, p1, lod))) +
+ 337 | 			(g1(fuv.y) * (g0x * textureLod(tex, p2, lod) + g1x * textureLod(tex, p3, lod)));
+ 338 | }
+ 339 | 
+ 340 | #define GLOW_TEXTURE_SAMPLE(m_tex, m_uv, m_lod) texture2D_bicubic(m_tex, m_uv, m_lod)
+ 341 | #endif 
+ 342 | 
+ 343 | #else 
+ 344 | 
+ 345 | #ifdef USE_MULTIVIEW
+ 346 | #define GLOW_TEXTURE_SAMPLE(m_tex, m_uv, m_lod) textureLod(m_tex, vec3(m_uv, ViewIndex), float(m_lod))
+ 347 | #else 
+ 348 | #define GLOW_TEXTURE_SAMPLE(m_tex, m_uv, m_lod) textureLod(m_tex, m_uv, float(m_lod))
+ 349 | #endif 
+ 350 | 
+ 351 | #endif 
+ 352 | 
+ 353 | vec3 gather_glow(SAMPLER_FORMAT tex, vec2 uv) { 
+ 354 | 
+ 355 | 	vec3 glow = vec3(0.0f);
+ 356 | 
+ 357 | 	if (params.glow_levels[0] > 0.0001) {
+ 358 | 		glow += GLOW_TEXTURE_SAMPLE(tex, uv, 0).rgb * params.glow_levels[0];
+ 359 | 	}
+ 360 | 
+ 361 | 	if (params.glow_levels[1] > 0.0001) {
+ 362 | 		glow += GLOW_TEXTURE_SAMPLE(tex, uv, 1).rgb * params.glow_levels[1];
+ 363 | 	}
+ 364 | 
+ 365 | 	if (params.glow_levels[2] > 0.0001) {
+ 366 | 		glow += GLOW_TEXTURE_SAMPLE(tex, uv, 2).rgb * params.glow_levels[2];
+ 367 | 	}
+ 368 | 
+ 369 | 	if (params.glow_levels[3] > 0.0001) {
+ 370 | 		glow += GLOW_TEXTURE_SAMPLE(tex, uv, 3).rgb * params.glow_levels[3];
+ 371 | 	}
+ 372 | 
+ 373 | 	if (params.glow_levels[4] > 0.0001) {
+ 374 | 		glow += GLOW_TEXTURE_SAMPLE(tex, uv, 4).rgb * params.glow_levels[4];
+ 375 | 	}
+ 376 | 
+ 377 | 	if (params.glow_levels[5] > 0.0001) {
+ 378 | 		glow += GLOW_TEXTURE_SAMPLE(tex, uv, 5).rgb * params.glow_levels[5];
+ 379 | 	}
+ 380 | 
+ 381 | 	if (params.glow_levels[6] > 0.0001) {
+ 382 | 		glow += GLOW_TEXTURE_SAMPLE(tex, uv, 6).rgb * params.glow_levels[6];
+ 383 | 	}
+ 384 | 
+ 385 | 	glow = glow * params.luminance_multiplier;
+ 386 | 
+ 387 | 	return glow;
+ 388 | }
+ 389 | 
+ 390 | #define GLOW_MODE_ADD 0
+ 391 | #define GLOW_MODE_SCREEN 1
+ 392 | #define GLOW_MODE_SOFTLIGHT 2
+ 393 | #define GLOW_MODE_REPLACE 3
+ 394 | #define GLOW_MODE_MIX 4
+ 395 | 
+ 396 | 
+ 397 | vec3 apply_glow(vec3 color, vec3 glow, float white) {
+ 398 | 	if (params.glow_mode == GLOW_MODE_ADD) {
+ 399 | 		return color + glow;
+ 400 | 	} else if (params.glow_mode == GLOW_MODE_SCREEN) {
+ 401 | 		
+ 402 | 		
+ 403 | 		
+ 404 | 		
+ 405 | 		
+ 406 | 		glow.rgb = clamp(glow.rgb, 0.0, white);
+ 407 | 
+ 408 | 		
+ 409 | 		
+ 410 | 		
+ 411 | 		
+ 412 | 		
+ 413 | 		
+ 414 | 
+ 415 | 		
+ 416 | 		color.rgb = color.rgb + glow.rgb - (color.rgb * glow.rgb / white);
+ 417 | 
+ 418 | 		return color;
+ 419 | 	} else if (params.glow_mode == GLOW_MODE_SOFTLIGHT) {
+ 420 | 		
+ 421 | 		
+ 422 | 		
+ 423 | 		
+ 424 | 		
+ 425 | 		
+ 426 | 		glow.rgb = clamp(glow.rgb, 0.0, 1.0);
+ 427 | 
+ 428 | 		color.r = color.r > 1.0 ? color.r : color.r + glow.r * ((color.r <= 0.25f ? ((16.0f * color.r - 12.0f) * color.r + 4.0f) * color.r : sqrt(color.r)) - color.r);
+ 429 | 		color.g = color.g > 1.0 ? color.g : color.g + glow.g * ((color.g <= 0.25f ? ((16.0f * color.g - 12.0f) * color.g + 4.0f) * color.g : sqrt(color.g)) - color.g);
+ 430 | 		color.b = color.b > 1.0 ? color.b : color.b + glow.b * ((color.b <= 0.25f ? ((16.0f * color.b - 12.0f) * color.b + 4.0f) * color.b : sqrt(color.b)) - color.b);
+ 431 | 
+ 432 | 		return color;
+ 433 | 	} else { 
+ 434 | 		return glow;
+ 435 | 	}
+ 436 | }
+ 437 | 
+ 438 | #ifdef USE_1D_LUT
+ 439 | vec3 apply_color_correction(vec3 color) {
+ 440 | 	color.r = texture(source_color_correction, vec2(color.r, 0.0f)).r;
+ 441 | 	color.g = texture(source_color_correction, vec2(color.g, 0.0f)).g;
+ 442 | 	color.b = texture(source_color_correction, vec2(color.b, 0.0f)).b;
+ 443 | 	return color;
+ 444 | }
+ 445 | #else
+ 446 | vec3 apply_color_correction(vec3 color) {
+ 447 | 	return textureLod(source_color_correction, color, 0.0).rgb;
+ 448 | }
+ 449 | #endif
+ 450 | 
+ 451 | 
+ 452 | 
+ 453 | 
+ 454 | 
+ 455 | 
+ 456 | 
+ 457 | 
+ 458 | 
+ 459 | 
+ 460 | 
+ 461 | 
+ 462 | 
+ 463 | 
+ 464 | 
+ 465 | 
+ 466 | 
+ 467 | 
+ 468 | 
+ 469 | 
+ 470 | 
+ 471 | 
+ 472 | 
+ 473 | 
+ 474 | 
+ 475 | 
+ 476 | 
+ 477 | 
+ 478 | 
+ 479 | 
+ 480 | 
+ 481 | 
+ 482 | 
+ 483 | 
+ 484 | 
+ 485 | 
+ 486 | 
+ 487 | 
+ 488 | 
+ 489 | 
+ 490 | 
+ 491 | 
+ 492 | 
+ 493 | 
+ 494 | 
+ 495 | 
+ 496 | 
+ 497 | 
+ 498 | 
+ 499 | 
+ 500 | 
+ 501 | 
+ 502 | 
+ 503 | 
+ 504 | 
+ 505 | 
+ 506 | 
+ 507 | 
+ 508 | 
+ 509 | 
+ 510 | 
+ 511 | 
+ 512 | 
+ 513 | 
+ 514 | 
+ 515 | float QUALITY(float q) {
+ 516 | 	return (q < 5 ? 1.0 : (q > 5 ? (q < 10 ? 2.0 : (q < 11 ? 4.0 : 8.0)) : 1.5));
+ 517 | }
+ 518 | 
+ 519 | float rgb2luma(vec3 rgb) {
+ 520 | 	return sqrt(dot(rgb, vec3(0.299, 0.587, 0.114)));
+ 521 | }
+ 522 | 
+ 523 | vec3 do_fxaa(vec3 color, float exposure, vec2 uv_interp) {
+ 524 | 	const float EDGE_THRESHOLD_MIN = 0.0312;
+ 525 | 	const float EDGE_THRESHOLD_MAX = 0.125;
+ 526 | 	const int ITERATIONS = 12;
+ 527 | 	const float SUBPIXEL_QUALITY = 0.75;
+ 528 | 
+ 529 | #ifdef USE_MULTIVIEW
+ 530 | 	float lumaUp = rgb2luma(textureLodOffset(source_color, vec3(uv_interp, ViewIndex), 0.0, ivec2(0, 1)).xyz * exposure * params.luminance_multiplier);
+ 531 | 	float lumaDown = rgb2luma(textureLodOffset(source_color, vec3(uv_interp, ViewIndex), 0.0, ivec2(0, -1)).xyz * exposure * params.luminance_multiplier);
+ 532 | 	float lumaLeft = rgb2luma(textureLodOffset(source_color, vec3(uv_interp, ViewIndex), 0.0, ivec2(-1, 0)).xyz * exposure * params.luminance_multiplier);
+ 533 | 	float lumaRight = rgb2luma(textureLodOffset(source_color, vec3(uv_interp, ViewIndex), 0.0, ivec2(1, 0)).xyz * exposure * params.luminance_multiplier);
+ 534 | 
+ 535 | 	float lumaCenter = rgb2luma(color);
+ 536 | 
+ 537 | 	float lumaMin = min(lumaCenter, min(min(lumaUp, lumaDown), min(lumaLeft, lumaRight)));
+ 538 | 	float lumaMax = max(lumaCenter, max(max(lumaUp, lumaDown), max(lumaLeft, lumaRight)));
+ 539 | 
+ 540 | 	float lumaRange = lumaMax - lumaMin;
+ 541 | 
+ 542 | 	if (lumaRange < max(EDGE_THRESHOLD_MIN, lumaMax * EDGE_THRESHOLD_MAX)) {
+ 543 | 		return color;
+ 544 | 	}
+ 545 | 
+ 546 | 	float lumaDownLeft = rgb2luma(textureLodOffset(source_color, vec3(uv_interp, ViewIndex), 0.0, ivec2(-1, -1)).xyz * exposure * params.luminance_multiplier);
+ 547 | 	float lumaUpRight = rgb2luma(textureLodOffset(source_color, vec3(uv_interp, ViewIndex), 0.0, ivec2(1, 1)).xyz * exposure * params.luminance_multiplier);
+ 548 | 	float lumaUpLeft = rgb2luma(textureLodOffset(source_color, vec3(uv_interp, ViewIndex), 0.0, ivec2(-1, 1)).xyz * exposure * params.luminance_multiplier);
+ 549 | 	float lumaDownRight = rgb2luma(textureLodOffset(source_color, vec3(uv_interp, ViewIndex), 0.0, ivec2(1, -1)).xyz * exposure * params.luminance_multiplier);
+ 550 | 
+ 551 | 	float lumaDownUp = lumaDown + lumaUp;
+ 552 | 	float lumaLeftRight = lumaLeft + lumaRight;
+ 553 | 
+ 554 | 	float lumaLeftCorners = lumaDownLeft + lumaUpLeft;
+ 555 | 	float lumaDownCorners = lumaDownLeft + lumaDownRight;
+ 556 | 	float lumaRightCorners = lumaDownRight + lumaUpRight;
+ 557 | 	float lumaUpCorners = lumaUpRight + lumaUpLeft;
+ 558 | 
+ 559 | 	float edgeHorizontal = abs(-2.0 * lumaLeft + lumaLeftCorners) + abs(-2.0 * lumaCenter + lumaDownUp) * 2.0 + abs(-2.0 * lumaRight + lumaRightCorners);
+ 560 | 	float edgeVertical = abs(-2.0 * lumaUp + lumaUpCorners) + abs(-2.0 * lumaCenter + lumaLeftRight) * 2.0 + abs(-2.0 * lumaDown + lumaDownCorners);
+ 561 | 
+ 562 | 	bool isHorizontal = (edgeHorizontal >= edgeVertical);
+ 563 | 
+ 564 | 	float stepLength = isHorizontal ? params.pixel_size.y : params.pixel_size.x;
+ 565 | 
+ 566 | 	float luma1 = isHorizontal ? lumaDown : lumaLeft;
+ 567 | 	float luma2 = isHorizontal ? lumaUp : lumaRight;
+ 568 | 	float gradient1 = luma1 - lumaCenter;
+ 569 | 	float gradient2 = luma2 - lumaCenter;
+ 570 | 
+ 571 | 	bool is1Steepest = abs(gradient1) >= abs(gradient2);
+ 572 | 
+ 573 | 	float gradientScaled = 0.25 * max(abs(gradient1), abs(gradient2));
+ 574 | 
+ 575 | 	float lumaLocalAverage = 0.0;
+ 576 | 	if (is1Steepest) {
+ 577 | 		stepLength = -stepLength;
+ 578 | 		lumaLocalAverage = 0.5 * (luma1 + lumaCenter);
+ 579 | 	} else {
+ 580 | 		lumaLocalAverage = 0.5 * (luma2 + lumaCenter);
+ 581 | 	}
+ 582 | 
+ 583 | 	vec2 currentUv = uv_interp;
+ 584 | 	if (isHorizontal) {
+ 585 | 		currentUv.y += stepLength * 0.5;
+ 586 | 	} else {
+ 587 | 		currentUv.x += stepLength * 0.5;
+ 588 | 	}
+ 589 | 
+ 590 | 	vec2 offset = isHorizontal ? vec2(params.pixel_size.x, 0.0) : vec2(0.0, params.pixel_size.y);
+ 591 | 	vec3 uv1 = vec3(currentUv - offset * QUALITY(0), ViewIndex);
+ 592 | 	vec3 uv2 = vec3(currentUv + offset * QUALITY(0), ViewIndex);
+ 593 | 
+ 594 | 	float lumaEnd1 = rgb2luma(textureLod(source_color, uv1, 0.0).xyz * exposure * params.luminance_multiplier);
+ 595 | 	float lumaEnd2 = rgb2luma(textureLod(source_color, uv2, 0.0).xyz * exposure * params.luminance_multiplier);
+ 596 | 	lumaEnd1 -= lumaLocalAverage;
+ 597 | 	lumaEnd2 -= lumaLocalAverage;
+ 598 | 
+ 599 | 	bool reached1 = abs(lumaEnd1) >= gradientScaled;
+ 600 | 	bool reached2 = abs(lumaEnd2) >= gradientScaled;
+ 601 | 	bool reachedBoth = reached1 && reached2;
+ 602 | 
+ 603 | 	if (!reached1) {
+ 604 | 		uv1 -= vec3(offset * QUALITY(1), 0.0);
+ 605 | 	}
+ 606 | 	if (!reached2) {
+ 607 | 		uv2 += vec3(offset * QUALITY(1), 0.0);
+ 608 | 	}
+ 609 | 
+ 610 | 	if (!reachedBoth) {
+ 611 | 		for (int i = 2; i < ITERATIONS; i++) {
+ 612 | 			if (!reached1) {
+ 613 | 				lumaEnd1 = rgb2luma(textureLod(source_color, uv1, 0.0).xyz * exposure * params.luminance_multiplier);
+ 614 | 				lumaEnd1 = lumaEnd1 - lumaLocalAverage;
+ 615 | 			}
+ 616 | 			if (!reached2) {
+ 617 | 				lumaEnd2 = rgb2luma(textureLod(source_color, uv2, 0.0).xyz * exposure * params.luminance_multiplier);
+ 618 | 				lumaEnd2 = lumaEnd2 - lumaLocalAverage;
+ 619 | 			}
+ 620 | 			reached1 = abs(lumaEnd1) >= gradientScaled;
+ 621 | 			reached2 = abs(lumaEnd2) >= gradientScaled;
+ 622 | 			reachedBoth = reached1 && reached2;
+ 623 | 			if (!reached1) {
+ 624 | 				uv1 -= vec3(offset * QUALITY(i), 0.0);
+ 625 | 			}
+ 626 | 			if (!reached2) {
+ 627 | 				uv2 += vec3(offset * QUALITY(i), 0.0);
+ 628 | 			}
+ 629 | 			if (reachedBoth) {
+ 630 | 				break;
+ 631 | 			}
+ 632 | 		}
+ 633 | 	}
+ 634 | 
+ 635 | 	float distance1 = isHorizontal ? (uv_interp.x - uv1.x) : (uv_interp.y - uv1.y);
+ 636 | 	float distance2 = isHorizontal ? (uv2.x - uv_interp.x) : (uv2.y - uv_interp.y);
+ 637 | 
+ 638 | 	bool isDirection1 = distance1 < distance2;
+ 639 | 	float distanceFinal = min(distance1, distance2);
+ 640 | 
+ 641 | 	float edgeThickness = (distance1 + distance2);
+ 642 | 
+ 643 | 	bool isLumaCenterSmaller = lumaCenter < lumaLocalAverage;
+ 644 | 
+ 645 | 	bool correctVariation1 = (lumaEnd1 < 0.0) != isLumaCenterSmaller;
+ 646 | 	bool correctVariation2 = (lumaEnd2 < 0.0) != isLumaCenterSmaller;
+ 647 | 
+ 648 | 	bool correctVariation = isDirection1 ? correctVariation1 : correctVariation2;
+ 649 | 
+ 650 | 	float pixelOffset = -distanceFinal / edgeThickness + 0.5;
+ 651 | 
+ 652 | 	float finalOffset = correctVariation ? pixelOffset : 0.0;
+ 653 | 
+ 654 | 	float lumaAverage = (1.0 / 12.0) * (2.0 * (lumaDownUp + lumaLeftRight) + lumaLeftCorners + lumaRightCorners);
+ 655 | 
+ 656 | 	float subPixelOffset1 = clamp(abs(lumaAverage - lumaCenter) / lumaRange, 0.0, 1.0);
+ 657 | 	float subPixelOffset2 = (-2.0 * subPixelOffset1 + 3.0) * subPixelOffset1 * subPixelOffset1;
+ 658 | 
+ 659 | 	float subPixelOffsetFinal = subPixelOffset2 * subPixelOffset2 * SUBPIXEL_QUALITY;
+ 660 | 
+ 661 | 	finalOffset = max(finalOffset, subPixelOffsetFinal);
+ 662 | 
+ 663 | 	vec3 finalUv = vec3(uv_interp, ViewIndex);
+ 664 | 	if (isHorizontal) {
+ 665 | 		finalUv.y += finalOffset * stepLength;
+ 666 | 	} else {
+ 667 | 		finalUv.x += finalOffset * stepLength;
+ 668 | 	}
+ 669 | 
+ 670 | 	vec3 finalColor = textureLod(source_color, finalUv, 0.0).xyz * exposure * params.luminance_multiplier;
+ 671 | 	return finalColor;
+ 672 | 
+ 673 | #else
+ 674 | 	float lumaUp = rgb2luma(textureLodOffset(source_color, uv_interp, 0.0, ivec2(0, 1)).xyz * exposure * params.luminance_multiplier);
+ 675 | 	float lumaDown = rgb2luma(textureLodOffset(source_color, uv_interp, 0.0, ivec2(0, -1)).xyz * exposure * params.luminance_multiplier);
+ 676 | 	float lumaLeft = rgb2luma(textureLodOffset(source_color, uv_interp, 0.0, ivec2(-1, 0)).xyz * exposure * params.luminance_multiplier);
+ 677 | 	float lumaRight = rgb2luma(textureLodOffset(source_color, uv_interp, 0.0, ivec2(1, 0)).xyz * exposure * params.luminance_multiplier);
+ 678 | 
+ 679 | 	float lumaCenter = rgb2luma(color);
+ 680 | 
+ 681 | 	float lumaMin = min(lumaCenter, min(min(lumaUp, lumaDown), min(lumaLeft, lumaRight)));
+ 682 | 	float lumaMax = max(lumaCenter, max(max(lumaUp, lumaDown), max(lumaLeft, lumaRight)));
+ 683 | 
+ 684 | 	float lumaRange = lumaMax - lumaMin;
+ 685 | 
+ 686 | 	if (lumaRange < max(EDGE_THRESHOLD_MIN, lumaMax * EDGE_THRESHOLD_MAX)) {
+ 687 | 		return color;
+ 688 | 	}
+ 689 | 
+ 690 | 	float lumaDownLeft = rgb2luma(textureLodOffset(source_color, uv_interp, 0.0, ivec2(-1, -1)).xyz * exposure * params.luminance_multiplier);
+ 691 | 	float lumaUpRight = rgb2luma(textureLodOffset(source_color, uv_interp, 0.0, ivec2(1, 1)).xyz * exposure * params.luminance_multiplier);
+ 692 | 	float lumaUpLeft = rgb2luma(textureLodOffset(source_color, uv_interp, 0.0, ivec2(-1, 1)).xyz * exposure * params.luminance_multiplier);
+ 693 | 	float lumaDownRight = rgb2luma(textureLodOffset(source_color, uv_interp, 0.0, ivec2(1, -1)).xyz * exposure * params.luminance_multiplier);
+ 694 | 
+ 695 | 	float lumaDownUp = lumaDown + lumaUp;
+ 696 | 	float lumaLeftRight = lumaLeft + lumaRight;
+ 697 | 
+ 698 | 	float lumaLeftCorners = lumaDownLeft + lumaUpLeft;
+ 699 | 	float lumaDownCorners = lumaDownLeft + lumaDownRight;
+ 700 | 	float lumaRightCorners = lumaDownRight + lumaUpRight;
+ 701 | 	float lumaUpCorners = lumaUpRight + lumaUpLeft;
+ 702 | 
+ 703 | 	float edgeHorizontal = abs(-2.0 * lumaLeft + lumaLeftCorners) + abs(-2.0 * lumaCenter + lumaDownUp) * 2.0 + abs(-2.0 * lumaRight + lumaRightCorners);
+ 704 | 	float edgeVertical = abs(-2.0 * lumaUp + lumaUpCorners) + abs(-2.0 * lumaCenter + lumaLeftRight) * 2.0 + abs(-2.0 * lumaDown + lumaDownCorners);
+ 705 | 
+ 706 | 	bool isHorizontal = (edgeHorizontal >= edgeVertical);
+ 707 | 
+ 708 | 	float stepLength = isHorizontal ? params.pixel_size.y : params.pixel_size.x;
+ 709 | 
+ 710 | 	float luma1 = isHorizontal ? lumaDown : lumaLeft;
+ 711 | 	float luma2 = isHorizontal ? lumaUp : lumaRight;
+ 712 | 	float gradient1 = luma1 - lumaCenter;
+ 713 | 	float gradient2 = luma2 - lumaCenter;
+ 714 | 
+ 715 | 	bool is1Steepest = abs(gradient1) >= abs(gradient2);
+ 716 | 
+ 717 | 	float gradientScaled = 0.25 * max(abs(gradient1), abs(gradient2));
+ 718 | 
+ 719 | 	float lumaLocalAverage = 0.0;
+ 720 | 	if (is1Steepest) {
+ 721 | 		stepLength = -stepLength;
+ 722 | 		lumaLocalAverage = 0.5 * (luma1 + lumaCenter);
+ 723 | 	} else {
+ 724 | 		lumaLocalAverage = 0.5 * (luma2 + lumaCenter);
+ 725 | 	}
+ 726 | 
+ 727 | 	vec2 currentUv = uv_interp;
+ 728 | 	if (isHorizontal) {
+ 729 | 		currentUv.y += stepLength * 0.5;
+ 730 | 	} else {
+ 731 | 		currentUv.x += stepLength * 0.5;
+ 732 | 	}
+ 733 | 
+ 734 | 	vec2 offset = isHorizontal ? vec2(params.pixel_size.x, 0.0) : vec2(0.0, params.pixel_size.y);
+ 735 | 	vec2 uv1 = currentUv - offset * QUALITY(0);
+ 736 | 	vec2 uv2 = currentUv + offset * QUALITY(0);
+ 737 | 
+ 738 | 	float lumaEnd1 = rgb2luma(textureLod(source_color, uv1, 0.0).xyz * exposure * params.luminance_multiplier);
+ 739 | 	float lumaEnd2 = rgb2luma(textureLod(source_color, uv2, 0.0).xyz * exposure * params.luminance_multiplier);
+ 740 | 	lumaEnd1 -= lumaLocalAverage;
+ 741 | 	lumaEnd2 -= lumaLocalAverage;
+ 742 | 
+ 743 | 	bool reached1 = abs(lumaEnd1) >= gradientScaled;
+ 744 | 	bool reached2 = abs(lumaEnd2) >= gradientScaled;
+ 745 | 	bool reachedBoth = reached1 && reached2;
+ 746 | 
+ 747 | 	if (!reached1) {
+ 748 | 		uv1 -= offset * QUALITY(1);
+ 749 | 	}
+ 750 | 	if (!reached2) {
+ 751 | 		uv2 += offset * QUALITY(1);
+ 752 | 	}
+ 753 | 
+ 754 | 	if (!reachedBoth) {
+ 755 | 		for (int i = 2; i < ITERATIONS; i++) {
+ 756 | 			if (!reached1) {
+ 757 | 				lumaEnd1 = rgb2luma(textureLod(source_color, uv1, 0.0).xyz * exposure * params.luminance_multiplier);
+ 758 | 				lumaEnd1 = lumaEnd1 - lumaLocalAverage;
+ 759 | 			}
+ 760 | 			if (!reached2) {
+ 761 | 				lumaEnd2 = rgb2luma(textureLod(source_color, uv2, 0.0).xyz * exposure * params.luminance_multiplier);
+ 762 | 				lumaEnd2 = lumaEnd2 - lumaLocalAverage;
+ 763 | 			}
+ 764 | 			reached1 = abs(lumaEnd1) >= gradientScaled;
+ 765 | 			reached2 = abs(lumaEnd2) >= gradientScaled;
+ 766 | 			reachedBoth = reached1 && reached2;
+ 767 | 			if (!reached1) {
+ 768 | 				uv1 -= offset * QUALITY(i);
+ 769 | 			}
+ 770 | 			if (!reached2) {
+ 771 | 				uv2 += offset * QUALITY(i);
+ 772 | 			}
+ 773 | 			if (reachedBoth) {
+ 774 | 				break;
+ 775 | 			}
+ 776 | 		}
+ 777 | 	}
+ 778 | 
+ 779 | 	float distance1 = isHorizontal ? (uv_interp.x - uv1.x) : (uv_interp.y - uv1.y);
+ 780 | 	float distance2 = isHorizontal ? (uv2.x - uv_interp.x) : (uv2.y - uv_interp.y);
+ 781 | 
+ 782 | 	bool isDirection1 = distance1 < distance2;
+ 783 | 	float distanceFinal = min(distance1, distance2);
+ 784 | 
+ 785 | 	float edgeThickness = (distance1 + distance2);
+ 786 | 
+ 787 | 	bool isLumaCenterSmaller = lumaCenter < lumaLocalAverage;
+ 788 | 
+ 789 | 	bool correctVariation1 = (lumaEnd1 < 0.0) != isLumaCenterSmaller;
+ 790 | 	bool correctVariation2 = (lumaEnd2 < 0.0) != isLumaCenterSmaller;
+ 791 | 
+ 792 | 	bool correctVariation = isDirection1 ? correctVariation1 : correctVariation2;
+ 793 | 
+ 794 | 	float pixelOffset = -distanceFinal / edgeThickness + 0.5;
+ 795 | 
+ 796 | 	float finalOffset = correctVariation ? pixelOffset : 0.0;
+ 797 | 
+ 798 | 	float lumaAverage = (1.0 / 12.0) * (2.0 * (lumaDownUp + lumaLeftRight) + lumaLeftCorners + lumaRightCorners);
+ 799 | 
+ 800 | 	float subPixelOffset1 = clamp(abs(lumaAverage - lumaCenter) / lumaRange, 0.0, 1.0);
+ 801 | 	float subPixelOffset2 = (-2.0 * subPixelOffset1 + 3.0) * subPixelOffset1 * subPixelOffset1;
+ 802 | 
+ 803 | 	float subPixelOffsetFinal = subPixelOffset2 * subPixelOffset2 * SUBPIXEL_QUALITY;
+ 804 | 
+ 805 | 	finalOffset = max(finalOffset, subPixelOffsetFinal);
+ 806 | 
+ 807 | 	vec2 finalUv = uv_interp;
+ 808 | 	if (isHorizontal) {
+ 809 | 		finalUv.y += finalOffset * stepLength;
+ 810 | 	} else {
+ 811 | 		finalUv.x += finalOffset * stepLength;
+ 812 | 	}
+ 813 | 
+ 814 | 	vec3 finalColor = textureLod(source_color, finalUv, 0.0).xyz * exposure * params.luminance_multiplier;
+ 815 | 	return finalColor;
+ 816 | 
+ 817 | #endif
+ 818 | }
+ 819 | 
+ 820 | 
+ 821 | 
+ 822 | 
+ 823 | 
+ 824 | 
+ 825 | vec3 screen_space_dither(vec2 frag_coord, float bit_alignment_diviser) {
+ 826 | 	
+ 827 | 	
+ 828 | 	vec3 dither = vec3(dot(vec2(171.0, 231.0), frag_coord));
+ 829 | 	dither.rgb = fract(dither.rgb / vec3(103.0, 71.0, 97.0));
+ 830 | 
+ 831 | 	
+ 832 | 	
+ 833 | 	return (dither.rgb - 0.5) / bit_alignment_diviser;
+ 834 | }
+ 835 | 
+ 836 | void main() {
+ 837 | #ifdef USE_MULTIVIEW
+ 838 | 	vec4 color = textureLod(source_color, vec3(uv_interp, ViewIndex), 0.0f);
+ 839 | #else
+ 840 | 	vec4 color = textureLod(source_color, uv_interp, 0.0f);
+ 841 | #endif
+ 842 | 	color.rgb *= params.luminance_multiplier;
+ 843 | 
+ 844 | 	
+ 845 | 
+ 846 | 	float exposure = params.exposure;
+ 847 | 
+ 848 | 	if (bool(params.flags & FLAG_USE_AUTO_EXPOSURE)) {
+ 849 | 		exposure *= 1.0 / (texelFetch(source_auto_exposure, ivec2(0, 0), 0).r * params.luminance_multiplier / params.auto_exposure_scale);
+ 850 | 	}
+ 851 | 
+ 852 | 	color.rgb *= exposure;
+ 853 | 
+ 854 | 	
+ 855 | 	if (bool(params.flags & FLAG_USE_FXAA)) {
+ 856 | 		
+ 857 | 		color.rgb = do_fxaa(color.rgb, exposure, uv_interp);
+ 858 | 	}
+ 859 | 
+ 860 | 	if (bool(params.flags & FLAG_USE_GLOW) && params.glow_mode != GLOW_MODE_SOFTLIGHT) {
+ 861 | 		vec3 glow = gather_glow(source_glow, uv_interp) * params.glow_intensity;
+ 862 | 		if (params.glow_map_strength > 0.001) {
+ 863 | 			glow = mix(glow, texture(glow_map, uv_interp).rgb * glow, params.glow_map_strength);
+ 864 | 		}
+ 865 | 
+ 866 | 		if (params.glow_mode == GLOW_MODE_MIX) {
+ 867 | 			color.rgb = color.rgb * (1.0 - params.glow_intensity) + glow;
+ 868 | 		} else {
+ 869 | 			color.rgb = apply_glow(color.rgb, glow, params.white);
+ 870 | 		}
+ 871 | 	}
+ 872 | 
+ 873 | 	
+ 874 | 
+ 875 | 	color.rgb = apply_tonemapping(color.rgb);
+ 876 | 
+ 877 | 	
+ 878 | 
+ 879 | 	if (bool(params.flags & FLAG_USE_GLOW) && params.glow_mode == GLOW_MODE_SOFTLIGHT) {
+ 880 | 		
+ 881 | 		
+ 882 | 		
+ 883 | 		vec3 glow = gather_glow(source_glow, uv_interp) * params.glow_intensity;
+ 884 | 		if (params.glow_map_strength > 0.001) {
+ 885 | 			glow = mix(glow, texture(glow_map, uv_interp).rgb * glow, params.glow_map_strength);
+ 886 | 		}
+ 887 | 		glow = apply_tonemapping(glow);
+ 888 | 		color.rgb = apply_glow(color.rgb, glow, params.white);
+ 889 | 	}
+ 890 | 
+ 891 | 	
+ 892 | 
+ 893 | 	if (bool(params.flags & FLAG_USE_BCS)) {
+ 894 | 		
+ 895 | 		
+ 896 | 		
+ 897 | 		
+ 898 | 		color.rgb = color.rgb * params.bcs.x;
+ 899 | 
+ 900 | 		color.rgb = linear_to_srgb(color.rgb);
+ 901 | 
+ 902 | 		
+ 903 | 		
+ 904 | 		
+ 905 | 		
+ 906 | 		
+ 907 | 		color.rgb = mix(vec3(0.5), color.rgb, params.bcs.y);
+ 908 | 
+ 909 | 		
+ 910 | 		
+ 911 | 		
+ 912 | 		
+ 913 | 		color.rgb = mix(vec3(dot(vec3(1.0), color.rgb) * (1.0 / 3.0)), color.rgb, params.bcs.z);
+ 914 | 
+ 915 | 		if (bool(params.flags & FLAG_USE_COLOR_CORRECTION)) {
+ 916 | 			color.rgb = clamp(color.rgb, vec3(0.0), vec3(1.0));
+ 917 | 			color.rgb = apply_color_correction(color.rgb);
+ 918 | 			
+ 919 | 			
+ 920 | 			
+ 921 | 		} else if (!bool(params.flags & FLAG_CONVERT_TO_SRGB)) {
+ 922 | 			color.rgb = srgb_to_linear(color.rgb);
+ 923 | 		}
+ 924 | 	} else if (bool(params.flags & FLAG_CONVERT_TO_SRGB)) {
+ 925 | 		color.rgb = linear_to_srgb(color.rgb);
+ 926 | 	}
+ 927 | 
+ 928 | 	
+ 929 | 	
+ 930 | 
+ 931 | 	if (bool(params.flags & FLAG_USE_8_BIT_DEBANDING)) {
+ 932 | 		
+ 933 | 		color.rgb += screen_space_dither(gl_FragCoord.xy, 255.0);
+ 934 | 	}
+ 935 | 
+ 936 | 	frag_color = color;
+ 937 | }
+ 938 | 
+ 939 | 
+   at: compile_stages (servers/rendering/renderer_rd/shader_rd.cpp:1184)
+ERROR: code:
+   1 | 
+   2 | #version 450
+   3 | 
+   4 | 
+   5 | 
+   6 | 
+   7 | #define RENDER_DRIVER_METAL
+   8 | #define samplerExternalOES sampler2D
+   9 | #define textureExternalOES texture2D
+  10 | 
+  11 | #ifdef USE_MULTIVIEW
+  12 | #extension GL_EXT_multiview : enable
+  13 | #define ViewIndex gl_ViewIndex
+  14 | #endif 
+  15 | 
+  16 | layout(location = 0) in vec2 uv_interp;
+  17 | 
+  18 | #ifdef USE_MULTIVIEW
+  19 | #define SAMPLER_FORMAT sampler2DArray
+  20 | #else
+  21 | #define SAMPLER_FORMAT sampler2D
+  22 | #endif
+  23 | 
+  24 | layout(set = 0, binding = 0) uniform SAMPLER_FORMAT source_color;
+  25 | layout(set = 1, binding = 0) uniform sampler2D source_auto_exposure;
+  26 | layout(set = 2, binding = 0) uniform SAMPLER_FORMAT source_glow;
+  27 | layout(set = 2, binding = 1) uniform sampler2D glow_map; 
+  28 | 
+  29 | #ifdef USE_1D_LUT
+  30 | layout(set = 3, binding = 0) uniform sampler2D source_color_correction;
+  31 | #else
+  32 | layout(set = 3, binding = 0) uniform sampler3D source_color_correction;
+  33 | #endif
+  34 | 
+  35 | #define FLAG_USE_BCS (1 << 0)
+  36 | #define FLAG_USE_GLOW (1 << 1)
+  37 | #define FLAG_USE_AUTO_EXPOSURE (1 << 2)
+  38 | #define FLAG_USE_COLOR_CORRECTION (1 << 3)
+  39 | #define FLAG_USE_FXAA (1 << 4)
+  40 | #define FLAG_USE_8_BIT_DEBANDING (1 << 5)
+  41 | #define FLAG_CONVERT_TO_SRGB (1 << 6)
+  42 | 
+  43 | layout(push_constant, std430) uniform Params {
+  44 | 	vec3 bcs;
+  45 | 	uint flags;
+  46 | 
+  47 | 	vec2 pixel_size;
+  48 | 	uint tonemapper;
+  49 | 	float output_max_value;
+  50 | 
+  51 | 	uvec2 glow_texture_size;
+  52 | 	float glow_intensity;
+  53 | 	float glow_map_strength;
+  54 | 
+  55 | 	uint glow_mode;
+  56 | 	float glow_levels[7];
+  57 | 
+  58 | 	float exposure;
+  59 | 	float white;
+  60 | 	float auto_exposure_scale;
+  61 | 	float luminance_multiplier;
+  62 | 
+  63 | 	vec4 tonemapper_params;
+  64 | }
+  65 | params;
+  66 | 
+  67 | layout(location = 0) out vec4 frag_color;
+  68 | 
+  69 | 
+  70 | vec3 tonemap_reinhard(vec3 color) {
+  71 | 	float white_squared = params.tonemapper_params.x;
+  72 | 	
+  73 | 	return color * (1.0f + color / white_squared) / (1.0f + color / params.output_max_value);
+  74 | }
+  75 | 
+  76 | vec3 tonemap_filmic(vec3 color) {
+  77 | 	
+  78 | 	
+  79 | 	
+  80 | 	
+  81 | 	const float exposure_bias = 2.0f;
+  82 | 	const float A = 0.22f * exposure_bias * exposure_bias; 
+  83 | 	const float B = 0.30f * exposure_bias;
+  84 | 	const float C = 0.10f;
+  85 | 	const float D = 0.20f;
+  86 | 	const float E = 0.01f;
+  87 | 	const float F = 0.30f;
+  88 | 
+  89 | 	vec3 color_tonemapped = ((color * (A * color + C * B) + D * E) / (color * (A * color + B) + D * F)) - E / F;
+  90 | 
+  91 | 	return color_tonemapped / params.tonemapper_params.x;
+  92 | }
+  93 | 
+  94 | 
+  95 | 
+  96 | vec3 tonemap_aces(vec3 color) {
+  97 | 	
+  98 | 	const float exposure_bias = 1.8f;
+  99 | 	const float A = 0.0245786f;
+ 100 | 	const float B = 0.000090537f;
+ 101 | 	const float C = 0.983729f;
+ 102 | 	const float D = 0.432951f;
+ 103 | 	const float E = 0.238081f;
+ 104 | 
+ 105 | 	
+ 106 | 	const mat3 rgb_to_rrt = mat3(
+ 107 | 			vec3(0.59719f * exposure_bias, 0.35458f * exposure_bias, 0.04823f * exposure_bias),
+ 108 | 			vec3(0.07600f * exposure_bias, 0.90834f * exposure_bias, 0.01566f * exposure_bias),
+ 109 | 			vec3(0.02840f * exposure_bias, 0.13383f * exposure_bias, 0.83777f * exposure_bias));
+ 110 | 
+ 111 | 	const mat3 odt_to_rgb = mat3(
+ 112 | 			vec3(1.60475f, -0.53108f, -0.07367f),
+ 113 | 			vec3(-0.10208f, 1.10813f, -0.00605f),
+ 114 | 			vec3(-0.00327f, -0.07276f, 1.07602f));
+ 115 | 
+ 116 | 	color *= rgb_to_rrt;
+ 117 | 	vec3 color_tonemapped = (color * (color + A) - B) / (color * (C * color + D) + E);
+ 118 | 	color_tonemapped *= odt_to_rgb;
+ 119 | 
+ 120 | 	return color_tonemapped / params.tonemapper_params.x;
+ 121 | }
+ 122 | 
+ 123 | 
+ 124 | 
+ 125 | 
+ 126 | vec3 allenwp_curve(vec3 x) {
+ 127 | 	
+ 128 | 	
+ 129 | 	const float awp_crossover_point = 0.18;
+ 130 | 	
+ 131 | 	
+ 132 | 	const float awp_shoulder_max = params.output_max_value - awp_crossover_point;
+ 133 | 
+ 134 | 	float awp_contrast = params.tonemapper_params.x;
+ 135 | 	float awp_toe_a = params.tonemapper_params.y;
+ 136 | 	float awp_slope = params.tonemapper_params.z;
+ 137 | 	float awp_w = params.tonemapper_params.w;
+ 138 | 
+ 139 | 	
+ 140 | 	vec3 s = x - awp_crossover_point;
+ 141 | 	vec3 slope_s = awp_slope * s;
+ 142 | 	s = slope_s * (1.0 + s / awp_w) / (1.0 + (slope_s / awp_shoulder_max));
+ 143 | 	s += awp_crossover_point;
+ 144 | 
+ 145 | 	
+ 146 | 	vec3 t = pow(x, vec3(awp_contrast));
+ 147 | 	t = t / (t + awp_toe_a);
+ 148 | 
+ 149 | 	return mix(s, t, lessThan(x, vec3(awp_crossover_point)));
+ 150 | }
+ 151 | 
+ 152 | 
+ 153 | 
+ 154 | 
+ 155 | 
+ 156 | vec3 tonemap_agx(vec3 color) {
+ 157 | 	
+ 158 | 	
+ 159 | 	
+ 160 | 	
+ 161 | 	
+ 162 | 	
+ 163 | 	
+ 164 | 	
+ 165 | 	
+ 166 | 	
+ 167 | 	
+ 168 | 	
+ 169 | 	
+ 170 | 	
+ 171 | 	
+ 172 | 	
+ 173 | 	
+ 174 | 
+ 175 | 	
+ 176 | 	const mat3 rec709_to_rec2020_agx_inset_matrix = mat3(
+ 177 | 			0.544814746488245, 0.140416948464053, 0.0888104196149096,
+ 178 | 			0.373787398372697, 0.754137554567394, 0.178871756420858,
+ 179 | 			0.0813978551390581, 0.105445496968552, 0.732317823964232);
+ 180 | 
+ 181 | 	
+ 182 | 	const mat3 agx_outset_rec2020_to_rec709_matrix = mat3(
+ 183 | 			1.96488741169489, -0.299313364904742, -0.164352742528393,
+ 184 | 			-0.855988495690215, 1.32639796461980, -0.238183969428088,
+ 185 | 			-0.108898916004672, -0.0270845997150571, 1.40253671195648);
+ 186 | 
+ 187 | 	
+ 188 | 	color = rec709_to_rec2020_agx_inset_matrix * color;
+ 189 | 
+ 190 | 	
+ 191 | 	
+ 192 | 	color = allenwp_curve(color);
+ 193 | 
+ 194 | 	
+ 195 | 	
+ 196 | 	color = min(vec3(params.output_max_value), color);
+ 197 | 
+ 198 | 	
+ 199 | 	color = agx_outset_rec2020_to_rec709_matrix * color;
+ 200 | 
+ 201 | 	
+ 202 | 	
+ 203 | 	
+ 204 | 	return color;
+ 205 | }
+ 206 | 
+ 207 | vec3 linear_to_srgb(vec3 color) {
+ 208 | 	const vec3 a = vec3(0.055f);
+ 209 | 	return mix((vec3(1.0f) + a) * pow(color.rgb, vec3(1.0f / 2.4f)) - a, 12.92f * color.rgb, lessThan(color.rgb, vec3(0.0031308f)));
+ 210 | }
+ 211 | 
+ 212 | vec3 srgb_to_linear(vec3 color) {
+ 213 | 	const vec3 a = vec3(0.055f);
+ 214 | 	return mix(pow((color.rgb + a) * (1.0f / (vec3(1.0f) + a)), vec3(2.4f)), color.rgb * (1.0f / 12.92f), lessThan(color.rgb, vec3(0.04045f)));
+ 215 | }
+ 216 | 
+ 217 | #define TONEMAPPER_LINEAR 0
+ 218 | #define TONEMAPPER_REINHARD 1
+ 219 | #define TONEMAPPER_FILMIC 2
+ 220 | #define TONEMAPPER_ACES 3
+ 221 | #define TONEMAPPER_AGX 4
+ 222 | #define TONEMAPPER_GT7 5
+ 223 | 
+ 224 | vec3 apply_tonemapping(vec3 color) { 
+ 225 | 	if (params.tonemapper == TONEMAPPER_LINEAR) {
+ 226 | 		return color;
+ 227 | 	}
+ 228 | 
+ 229 | 	
+ 230 | 	
+ 231 | 	color = max(vec3(0.0), color);
+ 232 | 
+ 233 | 	if (params.tonemapper == TONEMAPPER_REINHARD) {
+ 234 | 		return tonemap_reinhard(color);
+ 235 | 	} else if (params.tonemapper == TONEMAPPER_FILMIC) {
+ 236 | 		return tonemap_filmic(color);
+ 237 | 	} else if (params.tonemapper == TONEMAPPER_ACES) {
+ 238 | 		return tonemap_aces(color);
+ 239 | 	} else if (params.tonemapper == TONEMAPPER_AGX) {
+ 240 | 		return tonemap_agx(color);
+ 241 | 	} else { 
+ 242 | 		return tonemap_gt7(color);
+ 243 | 	}
+ 244 | }
+ 245 | 
+ 246 | #ifdef USE_GLOW_FILTER_BICUBIC
+ 247 | 
+ 248 | float w0(float a) {
+ 249 | 	return (1.0f / 6.0f) * (a * (a * (-a + 3.0f) - 3.0f) + 1.0f);
+ 250 | }
+ 251 | 
+ 252 | float w1(float a) {
+ 253 | 	return (1.0f / 6.0f) * (a * a * (3.0f * a - 6.0f) + 4.0f);
+ 254 | }
+ 255 | 
+ 256 | float w2(float a) {
+ 257 | 	return (1.0f / 6.0f) * (a * (a * (-3.0f * a + 3.0f) + 3.0f) + 1.0f);
+ 258 | }
+ 259 | 
+ 260 | float w3(float a) {
+ 261 | 	return (1.0f / 6.0f) * (a * a * a);
+ 262 | }
+ 263 | 
+ 264 | 
+ 265 | float g0(float a) {
+ 266 | 	return w0(a) + w1(a);
+ 267 | }
+ 268 | 
+ 269 | float g1(float a) {
+ 270 | 	return w2(a) + w3(a);
+ 271 | }
+ 272 | 
+ 273 | 
+ 274 | float h0(float a) {
+ 275 | 	return -1.0f + w1(a) / (w0(a) + w1(a));
+ 276 | }
+ 277 | 
+ 278 | float h1(float a) {
+ 279 | 	return 1.0f + w3(a) / (w2(a) + w3(a));
+ 280 | }
+ 281 | 
+ 282 | #ifdef USE_MULTIVIEW
+ 283 | vec4 texture2D_bicubic(sampler2DArray tex, vec2 uv, int p_lod) {
+ 284 | 	float lod = float(p_lod);
+ 285 | 	vec2 tex_size = vec2(params.glow_texture_size >> p_lod);
+ 286 | 	vec2 pixel_size = vec2(1.0f) / tex_size;
+ 287 | 
+ 288 | 	uv = uv * tex_size + vec2(0.5f);
+ 289 | 
+ 290 | 	vec2 iuv = floor(uv);
+ 291 | 	vec2 fuv = fract(uv);
+ 292 | 
+ 293 | 	float g0x = g0(fuv.x);
+ 294 | 	float g1x = g1(fuv.x);
+ 295 | 	float h0x = h0(fuv.x);
+ 296 | 	float h1x = h1(fuv.x);
+ 297 | 	float h0y = h0(fuv.y);
+ 298 | 	float h1y = h1(fuv.y);
+ 299 | 
+ 300 | 	vec3 p0 = vec3((vec2(iuv.x + h0x, iuv.y + h0y) - vec2(0.5f)) * pixel_size, ViewIndex);
+ 301 | 	vec3 p1 = vec3((vec2(iuv.x + h1x, iuv.y + h0y) - vec2(0.5f)) * pixel_size, ViewIndex);
+ 302 | 	vec3 p2 = vec3((vec2(iuv.x + h0x, iuv.y + h1y) - vec2(0.5f)) * pixel_size, ViewIndex);
+ 303 | 	vec3 p3 = vec3((vec2(iuv.x + h1x, iuv.y + h1y) - vec2(0.5f)) * pixel_size, ViewIndex);
+ 304 | 
+ 305 | 	return (g0(fuv.y) * (g0x * textureLod(tex, p0, lod) + g1x * textureLod(tex, p1, lod))) +
+ 306 | 			(g1(fuv.y) * (g0x * textureLod(tex, p2, lod) + g1x * textureLod(tex, p3, lod)));
+ 307 | }
+ 308 | 
+ 309 | #define GLOW_TEXTURE_SAMPLE(m_tex, m_uv, m_lod) texture2D_bicubic(m_tex, m_uv, m_lod)
+ 310 | #else 
+ 311 | 
+ 312 | vec4 texture2D_bicubic(sampler2D tex, vec2 uv, int p_lod) {
+ 313 | 	float lod = float(p_lod);
+ 314 | 	vec2 tex_size = vec2(params.glow_texture_size >> p_lod);
+ 315 | 	vec2 pixel_size = vec2(1.0f) / tex_size;
+ 316 | 
+ 317 | 	uv = uv * tex_size + vec2(0.5f);
+ 318 | 
+ 319 | 	vec2 iuv = floor(uv);
+ 320 | 	vec2 fuv = fract(uv);
+ 321 | 
+ 322 | 	float g0x = g0(fuv.x);
+ 323 | 	float g1x = g1(fuv.x);
+ 324 | 	float h0x = h0(fuv.x);
+ 325 | 	float h1x = h1(fuv.x);
+ 326 | 	float h0y = h0(fuv.y);
+ 327 | 	float h1y = h1(fuv.y);
+ 328 | 
+ 329 | 	vec2 p0 = (vec2(iuv.x + h0x, iuv.y + h0y) - vec2(0.5f)) * pixel_size;
+ 330 | 	vec2 p1 = (vec2(iuv.x + h1x, iuv.y + h0y) - vec2(0.5f)) * pixel_size;
+ 331 | 	vec2 p2 = (vec2(iuv.x + h0x, iuv.y + h1y) - vec2(0.5f)) * pixel_size;
+ 332 | 	vec2 p3 = (vec2(iuv.x + h1x, iuv.y + h1y) - vec2(0.5f)) * pixel_size;
+ 333 | 
+ 334 | 	return (g0(fuv.y) * (g0x * textureLod(tex, p0, lod) + g1x * textureLod(tex, p1, lod))) +
+ 335 | 			(g1(fuv.y) * (g0x * textureLod(tex, p2, lod) + g1x * textureLod(tex, p3, lod)));
+ 336 | }
+ 337 | 
+ 338 | #define GLOW_TEXTURE_SAMPLE(m_tex, m_uv, m_lod) texture2D_bicubic(m_tex, m_uv, m_lod)
+ 339 | #endif 
+ 340 | 
+ 341 | #else 
+ 342 | 
+ 343 | #ifdef USE_MULTIVIEW
+ 344 | #define GLOW_TEXTURE_SAMPLE(m_tex, m_uv, m_lod) textureLod(m_tex, vec3(m_uv, ViewIndex), float(m_lod))
+ 345 | #else 
+ 346 | #define GLOW_TEXTURE_SAMPLE(m_tex, m_uv, m_lod) textureLod(m_tex, m_uv, float(m_lod))
+ 347 | #endif 
+ 348 | 
+ 349 | #endif 
+ 350 | 
+ 351 | vec3 gather_glow(SAMPLER_FORMAT tex, vec2 uv) { 
+ 352 | 
+ 353 | 	vec3 glow = vec3(0.0f);
+ 354 | 
+ 355 | 	if (params.glow_levels[0] > 0.0001) {
+ 356 | 		glow += GLOW_TEXTURE_SAMPLE(tex, uv, 0).rgb * params.glow_levels[0];
+ 357 | 	}
+ 358 | 
+ 359 | 	if (params.glow_levels[1] > 0.0001) {
+ 360 | 		glow += GLOW_TEXTURE_SAMPLE(tex, uv, 1).rgb * params.glow_levels[1];
+ 361 | 	}
+ 362 | 
+ 363 | 	if (params.glow_levels[2] > 0.0001) {
+ 364 | 		glow += GLOW_TEXTURE_SAMPLE(tex, uv, 2).rgb * params.glow_levels[2];
+ 365 | 	}
+ 366 | 
+ 367 | 	if (params.glow_levels[3] > 0.0001) {
+ 368 | 		glow += GLOW_TEXTURE_SAMPLE(tex, uv, 3).rgb * params.glow_levels[3];
+ 369 | 	}
+ 370 | 
+ 371 | 	if (params.glow_levels[4] > 0.0001) {
+ 372 | 		glow += GLOW_TEXTURE_SAMPLE(tex, uv, 4).rgb * params.glow_levels[4];
+ 373 | 	}
+ 374 | 
+ 375 | 	if (params.glow_levels[5] > 0.0001) {
+ 376 | 		glow += GLOW_TEXTURE_SAMPLE(tex, uv, 5).rgb * params.glow_levels[5];
+ 377 | 	}
+ 378 | 
+ 379 | 	if (params.glow_levels[6] > 0.0001) {
+ 380 | 		glow += GLOW_TEXTURE_SAMPLE(tex, uv, 6).rgb * params.glow_levels[6];
+ 381 | 	}
+ 382 | 
+ 383 | 	glow = glow * params.luminance_multiplier;
+ 384 | 
+ 385 | 	return glow;
+ 386 | }
+ 387 | 
+ 388 | #define GLOW_MODE_ADD 0
+ 389 | #define GLOW_MODE_SCREEN 1
+ 390 | #define GLOW_MODE_SOFTLIGHT 2
+ 391 | #define GLOW_MODE_REPLACE 3
+ 392 | #define GLOW_MODE_MIX 4
+ 393 | 
+ 394 | 
+ 395 | vec3 apply_glow(vec3 color, vec3 glow, float white) {
+ 396 | 	if (params.glow_mode == GLOW_MODE_ADD) {
+ 397 | 		return color + glow;
+ 398 | 	} else if (params.glow_mode == GLOW_MODE_SCREEN) {
+ 399 | 		
+ 400 | 		
+ 401 | 		
+ 402 | 		
+ 403 | 		
+ 404 | 		glow.rgb = clamp(glow.rgb, 0.0, white);
+ 405 | 
+ 406 | 		
+ 407 | 		
+ 408 | 		
+ 409 | 		
+ 410 | 		
+ 411 | 		
+ 412 | 
+ 413 | 		
+ 414 | 		color.rgb = color.rgb + glow.rgb - (color.rgb * glow.rgb / white);
+ 415 | 
+ 416 | 		return color;
+ 417 | 	} else if (params.glow_mode == GLOW_MODE_SOFTLIGHT) {
+ 418 | 		
+ 419 | 		
+ 420 | 		
+ 421 | 		
+ 422 | 		
+ 423 | 		
+ 424 | 		glow.rgb = clamp(glow.rgb, 0.0, 1.0);
+ 425 | 
+ 426 | 		color.r = color.r > 1.0 ? color.r : color.r + glow.r * ((color.r <= 0.25f ? ((16.0f * color.r - 12.0f) * color.r + 4.0f) * color.r : sqrt(color.r)) - color.r);
+ 427 | 		color.g = color.g > 1.0 ? color.g : color.g + glow.g * ((color.g <= 0.25f ? ((16.0f * color.g - 12.0f) * color.g + 4.0f) * color.g : sqrt(color.g)) - color.g);
+ 428 | 		color.b = color.b > 1.0 ? color.b : color.b + glow.b * ((color.b <= 0.25f ? ((16.0f * color.b - 12.0f) * color.b + 4.0f) * color.b : sqrt(color.b)) - color.b);
+ 429 | 
+ 430 | 		return color;
+ 431 | 	} else { 
+ 432 | 		return glow;
+ 433 | 	}
+ 434 | }
+ 435 | 
+ 436 | #ifdef USE_1D_LUT
+ 437 | vec3 apply_color_correction(vec3 color) {
+ 438 | 	color.r = texture(source_color_correction, vec2(color.r, 0.0f)).r;
+ 439 | 	color.g = texture(source_color_correction, vec2(color.g, 0.0f)).g;
+ 440 | 	color.b = texture(source_color_correction, vec2(color.b, 0.0f)).b;
+ 441 | 	return color;
+ 442 | }
+ 443 | #else
+ 444 | vec3 apply_color_correction(vec3 color) {
+ 445 | 	return textureLod(source_color_correction, color, 0.0).rgb;
+ 446 | }
+ 447 | #endif
+ 448 | 
+ 449 | 
+ 450 | 
+ 451 | 
+ 452 | 
+ 453 | 
+ 454 | 
+ 455 | 
+ 456 | 
+ 457 | 
+ 458 | 
+ 459 | 
+ 460 | 
+ 461 | 
+ 462 | 
+ 463 | 
+ 464 | 
+ 465 | 
+ 466 | 
+ 467 | 
+ 468 | 
+ 469 | 
+ 470 | 
+ 471 | 
+ 472 | 
+ 473 | 
+ 474 | 
+ 475 | 
+ 476 | 
+ 477 | 
+ 478 | 
+ 479 | 
+ 480 | 
+ 481 | 
+ 482 | 
+ 483 | 
+ 484 | 
+ 485 | 
+ 486 | 
+ 487 | 
+ 488 | 
+ 489 | 
+ 490 | 
+ 491 | 
+ 492 | 
+ 493 | 
+ 494 | 
+ 495 | 
+ 496 | 
+ 497 | 
+ 498 | 
+ 499 | 
+ 500 | 
+ 501 | 
+ 502 | 
+ 503 | 
+ 504 | 
+ 505 | 
+ 506 | 
+ 507 | 
+ 508 | 
+ 509 | 
+ 510 | 
+ 511 | 
+ 512 | 
+ 513 | float QUALITY(float q) {
+ 514 | 	return (q < 5 ? 1.0 : (q > 5 ? (q < 10 ? 2.0 : (q < 11 ? 4.0 : 8.0)) : 1.5));
+ 515 | }
+ 516 | 
+ 517 | float rgb2luma(vec3 rgb) {
+ 518 | 	return sqrt(dot(rgb, vec3(0.299, 0.587, 0.114)));
+ 519 | }
+ 520 | 
+ 521 | vec3 do_fxaa(vec3 color, float exposure, vec2 uv_interp) {
+ 522 | 	const float EDGE_THRESHOLD_MIN = 0.0312;
+ 523 | 	const float EDGE_THRESHOLD_MAX = 0.125;
+ 524 | 	const int ITERATIONS = 12;
+ 525 | 	const float SUBPIXEL_QUALITY = 0.75;
+ 526 | 
+ 527 | #ifdef USE_MULTIVIEW
+ 528 | 	float lumaUp = rgb2luma(textureLodOffset(source_color, vec3(uv_interp, ViewIndex), 0.0, ivec2(0, 1)).xyz * exposure * params.luminance_multiplier);
+ 529 | 	float lumaDown = rgb2luma(textureLodOffset(source_color, vec3(uv_interp, ViewIndex), 0.0, ivec2(0, -1)).xyz * exposure * params.luminance_multiplier);
+ 530 | 	float lumaLeft = rgb2luma(textureLodOffset(source_color, vec3(uv_interp, ViewIndex), 0.0, ivec2(-1, 0)).xyz * exposure * params.luminance_multiplier);
+ 531 | 	float lumaRight = rgb2luma(textureLodOffset(source_color, vec3(uv_interp, ViewIndex), 0.0, ivec2(1, 0)).xyz * exposure * params.luminance_multiplier);
+ 532 | 
+ 533 | 	float lumaCenter = rgb2luma(color);
+ 534 | 
+ 535 | 	float lumaMin = min(lumaCenter, min(min(lumaUp, lumaDown), min(lumaLeft, lumaRight)));
+ 536 | 	float lumaMax = max(lumaCenter, max(max(lumaUp, lumaDown), max(lumaLeft, lumaRight)));
+ 537 | 
+ 538 | 	float lumaRange = lumaMax - lumaMin;
+ 539 | 
+ 540 | 	if (lumaRange < max(EDGE_THRESHOLD_MIN, lumaMax * EDGE_THRESHOLD_MAX)) {
+ 541 | 		return color;
+ 542 | 	}
+ 543 | 
+ 544 | 	float lumaDownLeft = rgb2luma(textureLodOffset(source_color, vec3(uv_interp, ViewIndex), 0.0, ivec2(-1, -1)).xyz * exposure * params.luminance_multiplier);
+ 545 | 	float lumaUpRight = rgb2luma(textureLodOffset(source_color, vec3(uv_interp, ViewIndex), 0.0, ivec2(1, 1)).xyz * exposure * params.luminance_multiplier);
+ 546 | 	float lumaUpLeft = rgb2luma(textureLodOffset(source_color, vec3(uv_interp, ViewIndex), 0.0, ivec2(-1, 1)).xyz * exposure * params.luminance_multiplier);
+ 547 | 	float lumaDownRight = rgb2luma(textureLodOffset(source_color, vec3(uv_interp, ViewIndex), 0.0, ivec2(1, -1)).xyz * exposure * params.luminance_multiplier);
+ 548 | 
+ 549 | 	float lumaDownUp = lumaDown + lumaUp;
+ 550 | 	float lumaLeftRight = lumaLeft + lumaRight;
+ 551 | 
+ 552 | 	float lumaLeftCorners = lumaDownLeft + lumaUpLeft;
+ 553 | 	float lumaDownCorners = lumaDownLeft + lumaDownRight;
+ 554 | 	float lumaRightCorners = lumaDownRight + lumaUpRight;
+ 555 | 	float lumaUpCorners = lumaUpRight + lumaUpLeft;
+ 556 | 
+ 557 | 	float edgeHorizontal = abs(-2.0 * lumaLeft + lumaLeftCorners) + abs(-2.0 * lumaCenter + lumaDownUp) * 2.0 + abs(-2.0 * lumaRight + lumaRightCorners);
+ 558 | 	float edgeVertical = abs(-2.0 * lumaUp + lumaUpCorners) + abs(-2.0 * lumaCenter + lumaLeftRight) * 2.0 + abs(-2.0 * lumaDown + lumaDownCorners);
+ 559 | 
+ 560 | 	bool isHorizontal = (edgeHorizontal >= edgeVertical);
+ 561 | 
+ 562 | 	float stepLength = isHorizontal ? params.pixel_size.y : params.pixel_size.x;
+ 563 | 
+ 564 | 	float luma1 = isHorizontal ? lumaDown : lumaLeft;
+ 565 | 	float luma2 = isHorizontal ? lumaUp : lumaRight;
+ 566 | 	float gradient1 = luma1 - lumaCenter;
+ 567 | 	float gradient2 = luma2 - lumaCenter;
+ 568 | 
+ 569 | 	bool is1Steepest = abs(gradient1) >= abs(gradient2);
+ 570 | 
+ 571 | 	float gradientScaled = 0.25 * max(abs(gradient1), abs(gradient2));
+ 572 | 
+ 573 | 	float lumaLocalAverage = 0.0;
+ 574 | 	if (is1Steepest) {
+ 575 | 		stepLength = -stepLength;
+ 576 | 		lumaLocalAverage = 0.5 * (luma1 + lumaCenter);
+ 577 | 	} else {
+ 578 | 		lumaLocalAverage = 0.5 * (luma2 + lumaCenter);
+ 579 | 	}
+ 580 | 
+ 581 | 	vec2 currentUv = uv_interp;
+ 582 | 	if (isHorizontal) {
+ 583 | 		currentUv.y += stepLength * 0.5;
+ 584 | 	} else {
+ 585 | 		currentUv.x += stepLength * 0.5;
+ 586 | 	}
+ 587 | 
+ 588 | 	vec2 offset = isHorizontal ? vec2(params.pixel_size.x, 0.0) : vec2(0.0, params.pixel_size.y);
+ 589 | 	vec3 uv1 = vec3(currentUv - offset * QUALITY(0), ViewIndex);
+ 590 | 	vec3 uv2 = vec3(currentUv + offset * QUALITY(0), ViewIndex);
+ 591 | 
+ 592 | 	float lumaEnd1 = rgb2luma(textureLod(source_color, uv1, 0.0).xyz * exposure * params.luminance_multiplier);
+ 593 | 	float lumaEnd2 = rgb2luma(textureLod(source_color, uv2, 0.0).xyz * exposure * params.luminance_multiplier);
+ 594 | 	lumaEnd1 -= lumaLocalAverage;
+ 595 | 	lumaEnd2 -= lumaLocalAverage;
+ 596 | 
+ 597 | 	bool reached1 = abs(lumaEnd1) >= gradientScaled;
+ 598 | 	bool reached2 = abs(lumaEnd2) >= gradientScaled;
+ 599 | 	bool reachedBoth = reached1 && reached2;
+ 600 | 
+ 601 | 	if (!reached1) {
+ 602 | 		uv1 -= vec3(offset * QUALITY(1), 0.0);
+ 603 | 	}
+ 604 | 	if (!reached2) {
+ 605 | 		uv2 += vec3(offset * QUALITY(1), 0.0);
+ 606 | 	}
+ 607 | 
+ 608 | 	if (!reachedBoth) {
+ 609 | 		for (int i = 2; i < ITERATIONS; i++) {
+ 610 | 			if (!reached1) {
+ 611 | 				lumaEnd1 = rgb2luma(textureLod(source_color, uv1, 0.0).xyz * exposure * params.luminance_multiplier);
+ 612 | 				lumaEnd1 = lumaEnd1 - lumaLocalAverage;
+ 613 | 			}
+ 614 | 			if (!reached2) {
+ 615 | 				lumaEnd2 = rgb2luma(textureLod(source_color, uv2, 0.0).xyz * exposure * params.luminance_multiplier);
+ 616 | 				lumaEnd2 = lumaEnd2 - lumaLocalAverage;
+ 617 | 			}
+ 618 | 			reached1 = abs(lumaEnd1) >= gradientScaled;
+ 619 | 			reached2 = abs(lumaEnd2) >= gradientScaled;
+ 620 | 			reachedBoth = reached1 && reached2;
+ 621 | 			if (!reached1) {
+ 622 | 				uv1 -= vec3(offset * QUALITY(i), 0.0);
+ 623 | 			}
+ 624 | 			if (!reached2) {
+ 625 | 				uv2 += vec3(offset * QUALITY(i), 0.0);
+ 626 | 			}
+ 627 | 			if (reachedBoth) {
+ 628 | 				break;
+ 629 | 			}
+ 630 | 		}
+ 631 | 	}
+ 632 | 
+ 633 | 	float distance1 = isHorizontal ? (uv_interp.x - uv1.x) : (uv_interp.y - uv1.y);
+ 634 | 	float distance2 = isHorizontal ? (uv2.x - uv_interp.x) : (uv2.y - uv_interp.y);
+ 635 | 
+ 636 | 	bool isDirection1 = distance1 < distance2;
+ 637 | 	float distanceFinal = min(distance1, distance2);
+ 638 | 
+ 639 | 	float edgeThickness = (distance1 + distance2);
+ 640 | 
+ 641 | 	bool isLumaCenterSmaller = lumaCenter < lumaLocalAverage;
+ 642 | 
+ 643 | 	bool correctVariation1 = (lumaEnd1 < 0.0) != isLumaCenterSmaller;
+ 644 | 	bool correctVariation2 = (lumaEnd2 < 0.0) != isLumaCenterSmaller;
+ 645 | 
+ 646 | 	bool correctVariation = isDirection1 ? correctVariation1 : correctVariation2;
+ 647 | 
+ 648 | 	float pixelOffset = -distanceFinal / edgeThickness + 0.5;
+ 649 | 
+ 650 | 	float finalOffset = correctVariation ? pixelOffset : 0.0;
+ 651 | 
+ 652 | 	float lumaAverage = (1.0 / 12.0) * (2.0 * (lumaDownUp + lumaLeftRight) + lumaLeftCorners + lumaRightCorners);
+ 653 | 
+ 654 | 	float subPixelOffset1 = clamp(abs(lumaAverage - lumaCenter) / lumaRange, 0.0, 1.0);
+ 655 | 	float subPixelOffset2 = (-2.0 * subPixelOffset1 + 3.0) * subPixelOffset1 * subPixelOffset1;
+ 656 | 
+ 657 | 	float subPixelOffsetFinal = subPixelOffset2 * subPixelOffset2 * SUBPIXEL_QUALITY;
+ 658 | 
+ 659 | 	finalOffset = max(finalOffset, subPixelOffsetFinal);
+ 660 | 
+ 661 | 	vec3 finalUv = vec3(uv_interp, ViewIndex);
+ 662 | 	if (isHorizontal) {
+ 663 | 		finalUv.y += finalOffset * stepLength;
+ 664 | 	} else {
+ 665 | 		finalUv.x += finalOffset * stepLength;
+ 666 | 	}
+ 667 | 
+ 668 | 	vec3 finalColor = textureLod(source_color, finalUv, 0.0).xyz * exposure * params.luminance_multiplier;
+ 669 | 	return finalColor;
+ 670 | 
+ 671 | #else
+ 672 | 	float lumaUp = rgb2luma(textureLodOffset(source_color, uv_interp, 0.0, ivec2(0, 1)).xyz * exposure * params.luminance_multiplier);
+ 673 | 	float lumaDown = rgb2luma(textureLodOffset(source_color, uv_interp, 0.0, ivec2(0, -1)).xyz * exposure * params.luminance_multiplier);
+ 674 | 	float lumaLeft = rgb2luma(textureLodOffset(source_color, uv_interp, 0.0, ivec2(-1, 0)).xyz * exposure * params.luminance_multiplier);
+ 675 | 	float lumaRight = rgb2luma(textureLodOffset(source_color, uv_interp, 0.0, ivec2(1, 0)).xyz * exposure * params.luminance_multiplier);
+ 676 | 
+ 677 | 	float lumaCenter = rgb2luma(color);
+ 678 | 
+ 679 | 	float lumaMin = min(lumaCenter, min(min(lumaUp, lumaDown), min(lumaLeft, lumaRight)));
+ 680 | 	float lumaMax = max(lumaCenter, max(max(lumaUp, lumaDown), max(lumaLeft, lumaRight)));
+ 681 | 
+ 682 | 	float lumaRange = lumaMax - lumaMin;
+ 683 | 
+ 684 | 	if (lumaRange < max(EDGE_THRESHOLD_MIN, lumaMax * EDGE_THRESHOLD_MAX)) {
+ 685 | 		return color;
+ 686 | 	}
+ 687 | 
+ 688 | 	float lumaDownLeft = rgb2luma(textureLodOffset(source_color, uv_interp, 0.0, ivec2(-1, -1)).xyz * exposure * params.luminance_multiplier);
+ 689 | 	float lumaUpRight = rgb2luma(textureLodOffset(source_color, uv_interp, 0.0, ivec2(1, 1)).xyz * exposure * params.luminance_multiplier);
+ 690 | 	float lumaUpLeft = rgb2luma(textureLodOffset(source_color, uv_interp, 0.0, ivec2(-1, 1)).xyz * exposure * params.luminance_multiplier);
+ 691 | 	float lumaDownRight = rgb2luma(textureLodOffset(source_color, uv_interp, 0.0, ivec2(1, -1)).xyz * exposure * params.luminance_multiplier);
+ 692 | 
+ 693 | 	float lumaDownUp = lumaDown + lumaUp;
+ 694 | 	float lumaLeftRight = lumaLeft + lumaRight;
+ 695 | 
+ 696 | 	float lumaLeftCorners = lumaDownLeft + lumaUpLeft;
+ 697 | 	float lumaDownCorners = lumaDownLeft + lumaDownRight;
+ 698 | 	float lumaRightCorners = lumaDownRight + lumaUpRight;
+ 699 | 	float lumaUpCorners = lumaUpRight + lumaUpLeft;
+ 700 | 
+ 701 | 	float edgeHorizontal = abs(-2.0 * lumaLeft + lumaLeftCorners) + abs(-2.0 * lumaCenter + lumaDownUp) * 2.0 + abs(-2.0 * lumaRight + lumaRightCorners);
+ 702 | 	float edgeVertical = abs(-2.0 * lumaUp + lumaUpCorners) + abs(-2.0 * lumaCenter + lumaLeftRight) * 2.0 + abs(-2.0 * lumaDown + lumaDownCorners);
+ 703 | 
+ 704 | 	bool isHorizontal = (edgeHorizontal >= edgeVertical);
+ 705 | 
+ 706 | 	float stepLength = isHorizontal ? params.pixel_size.y : params.pixel_size.x;
+ 707 | 
+ 708 | 	float luma1 = isHorizontal ? lumaDown : lumaLeft;
+ 709 | 	float luma2 = isHorizontal ? lumaUp : lumaRight;
+ 710 | 	float gradient1 = luma1 - lumaCenter;
+ 711 | 	float gradient2 = luma2 - lumaCenter;
+ 712 | 
+ 713 | 	bool is1Steepest = abs(gradient1) >= abs(gradient2);
+ 714 | 
+ 715 | 	float gradientScaled = 0.25 * max(abs(gradient1), abs(gradient2));
+ 716 | 
+ 717 | 	float lumaLocalAverage = 0.0;
+ 718 | 	if (is1Steepest) {
+ 719 | 		stepLength = -stepLength;
+ 720 | 		lumaLocalAverage = 0.5 * (luma1 + lumaCenter);
+ 721 | 	} else {
+ 722 | 		lumaLocalAverage = 0.5 * (luma2 + lumaCenter);
+ 723 | 	}
+ 724 | 
+ 725 | 	vec2 currentUv = uv_interp;
+ 726 | 	if (isHorizontal) {
+ 727 | 		currentUv.y += stepLength * 0.5;
+ 728 | 	} else {
+ 729 | 		currentUv.x += stepLength * 0.5;
+ 730 | 	}
+ 731 | 
+ 732 | 	vec2 offset = isHorizontal ? vec2(params.pixel_size.x, 0.0) : vec2(0.0, params.pixel_size.y);
+ 733 | 	vec2 uv1 = currentUv - offset * QUALITY(0);
+ 734 | 	vec2 uv2 = currentUv + offset * QUALITY(0);
+ 735 | 
+ 736 | 	float lumaEnd1 = rgb2luma(textureLod(source_color, uv1, 0.0).xyz * exposure * params.luminance_multiplier);
+ 737 | 	float lumaEnd2 = rgb2luma(textureLod(source_color, uv2, 0.0).xyz * exposure * params.luminance_multiplier);
+ 738 | 	lumaEnd1 -= lumaLocalAverage;
+ 739 | 	lumaEnd2 -= lumaLocalAverage;
+ 740 | 
+ 741 | 	bool reached1 = abs(lumaEnd1) >= gradientScaled;
+ 742 | 	bool reached2 = abs(lumaEnd2) >= gradientScaled;
+ 743 | 	bool reachedBoth = reached1 && reached2;
+ 744 | 
+ 745 | 	if (!reached1) {
+ 746 | 		uv1 -= offset * QUALITY(1);
+ 747 | 	}
+ 748 | 	if (!reached2) {
+ 749 | 		uv2 += offset * QUALITY(1);
+ 750 | 	}
+ 751 | 
+ 752 | 	if (!reachedBoth) {
+ 753 | 		for (int i = 2; i < ITERATIONS; i++) {
+ 754 | 			if (!reached1) {
+ 755 | 				lumaEnd1 = rgb2luma(textureLod(source_color, uv1, 0.0).xyz * exposure * params.luminance_multiplier);
+ 756 | 				lumaEnd1 = lumaEnd1 - lumaLocalAverage;
+ 757 | 			}
+ 758 | 			if (!reached2) {
+ 759 | 				lumaEnd2 = rgb2luma(textureLod(source_color, uv2, 0.0).xyz * exposure * params.luminance_multiplier);
+ 760 | 				lumaEnd2 = lumaEnd2 - lumaLocalAverage;
+ 761 | 			}
+ 762 | 			reached1 = abs(lumaEnd1) >= gradientScaled;
+ 763 | 			reached2 = abs(lumaEnd2) >= gradientScaled;
+ 764 | 			reachedBoth = reached1 && reached2;
+ 765 | 			if (!reached1) {
+ 766 | 				uv1 -= offset * QUALITY(i);
+ 767 | 			}
+ 768 | 			if (!reached2) {
+ 769 | 				uv2 += offset * QUALITY(i);
+ 770 | 			}
+ 771 | 			if (reachedBoth) {
+ 772 | 				break;
+ 773 | 			}
+ 774 | 		}
+ 775 | 	}
+ 776 | 
+ 777 | 	float distance1 = isHorizontal ? (uv_interp.x - uv1.x) : (uv_interp.y - uv1.y);
+ 778 | 	float distance2 = isHorizontal ? (uv2.x - uv_interp.x) : (uv2.y - uv_interp.y);
+ 779 | 
+ 780 | 	bool isDirection1 = distance1 < distance2;
+ 781 | 	float distanceFinal = min(distance1, distance2);
+ 782 | 
+ 783 | 	float edgeThickness = (distance1 + distance2);
+ 784 | 
+ 785 | 	bool isLumaCenterSmaller = lumaCenter < lumaLocalAverage;
+ 786 | 
+ 787 | 	bool correctVariation1 = (lumaEnd1 < 0.0) != isLumaCenterSmaller;
+ 788 | 	bool correctVariation2 = (lumaEnd2 < 0.0) != isLumaCenterSmaller;
+ 789 | 
+ 790 | 	bool correctVariation = isDirection1 ? correctVariation1 : correctVariation2;
+ 791 | 
+ 792 | 	float pixelOffset = -distanceFinal / edgeThickness + 0.5;
+ 793 | 
+ 794 | 	float finalOffset = correctVariation ? pixelOffset : 0.0;
+ 795 | 
+ 796 | 	float lumaAverage = (1.0 / 12.0) * (2.0 * (lumaDownUp + lumaLeftRight) + lumaLeftCorners + lumaRightCorners);
+ 797 | 
+ 798 | 	float subPixelOffset1 = clamp(abs(lumaAverage - lumaCenter) / lumaRange, 0.0, 1.0);
+ 799 | 	float subPixelOffset2 = (-2.0 * subPixelOffset1 + 3.0) * subPixelOffset1 * subPixelOffset1;
+ 800 | 
+ 801 | 	float subPixelOffsetFinal = subPixelOffset2 * subPixelOffset2 * SUBPIXEL_QUALITY;
+ 802 | 
+ 803 | 	finalOffset = max(finalOffset, subPixelOffsetFinal);
+ 804 | 
+ 805 | 	vec2 finalUv = uv_interp;
+ 806 | 	if (isHorizontal) {
+ 807 | 		finalUv.y += finalOffset * stepLength;
+ 808 | 	} else {
+ 809 | 		finalUv.x += finalOffset * stepLength;
+ 810 | 	}
+ 811 | 
+ 812 | 	vec3 finalColor = textureLod(source_color, finalUv, 0.0).xyz * exposure * params.luminance_multiplier;
+ 813 | 	return finalColor;
+ 814 | 
+ 815 | #endif
+ 816 | }
+ 817 | 
+ 818 | 
+ 819 | 
+ 820 | 
+ 821 | 
+ 822 | 
+ 823 | vec3 screen_space_dither(vec2 frag_coord, float bit_alignment_diviser) {
+ 824 | 	
+ 825 | 	
+ 826 | 	vec3 dither = vec3(dot(vec2(171.0, 231.0), frag_coord));
+ 827 | 	dither.rgb = fract(dither.rgb / vec3(103.0, 71.0, 97.0));
+ 828 | 
+ 829 | 	
+ 830 | 	
+ 831 | 	return (dither.rgb - 0.5) / bit_alignment_diviser;
+ 832 | }
+ 833 | 
+ 834 | void main() {
+ 835 | #ifdef USE_MULTIVIEW
+ 836 | 	vec4 color = textureLod(source_color, vec3(uv_interp, ViewIndex), 0.0f);
+ 837 | #else
+ 838 | 	vec4 color = textureLod(source_color, uv_interp, 0.0f);
+ 839 | #endif
+ 840 | 	color.rgb *= params.luminance_multiplier;
+ 841 | 
+ 842 | 	
+ 843 | 
+ 844 | 	float exposure = params.exposure;
+ 845 | 
+ 846 | 	if (bool(params.flags & FLAG_USE_AUTO_EXPOSURE)) {
+ 847 | 		exposure *= 1.0 / (texelFetch(source_auto_exposure, ivec2(0, 0), 0).r * params.luminance_multiplier / params.auto_exposure_scale);
+ 848 | 	}
+ 849 | 
+ 850 | 	color.rgb *= exposure;
+ 851 | 
+ 852 | 	
+ 853 | 	if (bool(params.flags & FLAG_USE_FXAA)) {
+ 854 | 		
+ 855 | 		color.rgb = do_fxaa(color.rgb, exposure, uv_interp);
+ 856 | 	}
+ 857 | 
+ 858 | 	if (bool(params.flags & FLAG_USE_GLOW) && params.glow_mode != GLOW_MODE_SOFTLIGHT) {
+ 859 | 		vec3 glow = gather_glow(source_glow, uv_interp) * params.glow_intensity;
+ 860 | 		if (params.glow_map_strength > 0.001) {
+ 861 | 			glow = mix(glow, texture(glow_map, uv_interp).rgb * glow, params.glow_map_strength);
+ 862 | 		}
+ 863 | 
+ 864 | 		if (params.glow_mode == GLOW_MODE_MIX) {
+ 865 | 			color.rgb = color.rgb * (1.0 - params.glow_intensity) + glow;
+ 866 | 		} else {
+ 867 | 			color.rgb = apply_glow(color.rgb, glow, params.white);
+ 868 | 		}
+ 869 | 	}
+ 870 | 
+ 871 | 	
+ 872 | 
+ 873 | 	color.rgb = apply_tonemapping(color.rgb);
+ 874 | 
+ 875 | 	
+ 876 | 
+ 877 | 	if (bool(params.flags & FLAG_USE_GLOW) && params.glow_mode == GLOW_MODE_SOFTLIGHT) {
+ 878 | 		
+ 879 | 		
+ 880 | 		
+ 881 | 		vec3 glow = gather_glow(source_glow, uv_interp) * params.glow_intensity;
+ 882 | 		if (params.glow_map_strength > 0.001) {
+ 883 | 			glow = mix(glow, texture(glow_map, uv_interp).rgb * glow, params.glow_map_strength);
+ 884 | 		}
+ 885 | 		glow = apply_tonemapping(glow);
+ 886 | 		color.rgb = apply_glow(color.rgb, glow, params.white);
+ 887 | 	}
+ 888 | 
+ 889 | 	
+ 890 | 
+ 891 | 	if (bool(params.flags & FLAG_USE_BCS)) {
+ 892 | 		
+ 893 | 		
+ 894 | 		
+ 895 | 		
+ 896 | 		color.rgb = color.rgb * params.bcs.x;
+ 897 | 
+ 898 | 		color.rgb = linear_to_srgb(color.rgb);
+ 899 | 
+ 900 | 		
+ 901 | 		
+ 902 | 		
+ 903 | 		
+ 904 | 		
+ 905 | 		color.rgb = mix(vec3(0.5), color.rgb, params.bcs.y);
+ 906 | 
+ 907 | 		
+ 908 | 		
+ 909 | 		
+ 910 | 		
+ 911 | 		color.rgb = mix(vec3(dot(vec3(1.0), color.rgb) * (1.0 / 3.0)), color.rgb, params.bcs.z);
+ 912 | 
+ 913 | 		if (bool(params.flags & FLAG_USE_COLOR_CORRECTION)) {
+ 914 | 			color.rgb = clamp(color.rgb, vec3(0.0), vec3(1.0));
+ 915 | 			color.rgb = apply_color_correction(color.rgb);
+ 916 | 			
+ 917 | 			
+ 918 | 			
+ 919 | 		} else if (!bool(params.flags & FLAG_CONVERT_TO_SRGB)) {
+ 920 | 			color.rgb = srgb_to_linear(color.rgb);
+ 921 | 		}
+ 922 | 	} else if (bool(params.flags & FLAG_CONVERT_TO_SRGB)) {
+ 923 | 		color.rgb = linear_to_srgb(color.rgb);
+ 924 | 	}
+ 925 | 
+ 926 | 	
+ 927 | 	
+ 928 | 
+ 929 | 	if (bool(params.flags & FLAG_USE_8_BIT_DEBANDING)) {
+ 930 | 		
+ 931 | 		color.rgb += screen_space_dither(gl_FragCoord.xy, 255.0);
+ 932 | 	}
+ 933 | 
+ 934 | 	frag_color = color;
+ 935 | }
+ 936 | 
+ 937 | 
+   at: compile_stages (servers/rendering/renderer_rd/shader_rd.cpp:1184)
+ERROR: Condition "variant_stages.is_empty()" is true.
+   at: _compile_variant (servers/rendering/renderer_rd/shader_rd.cpp:414)
+ERROR: Condition "variant_stages.is_empty()" is true.
+   at: _compile_variant (servers/rendering/renderer_rd/shader_rd.cpp:414)
+ERROR: Condition "p_shader.is_null()" is true.
+   at: setup (servers/rendering/renderer_rd/pipeline_cache_rd.cpp:87)
+ERROR: Condition "p_shader.is_null()" is true.
+   at: setup (servers/rendering/renderer_rd/pipeline_cache_rd.cpp:87)
+ERROR: Condition "p_shader.is_null()" is true.
+   at: setup (servers/rendering/renderer_rd/pipeline_cache_rd.cpp:87)
+ERROR: Condition "p_shader.is_null()" is true.
+   at: setup (servers/rendering/renderer_rd/pipeline_cache_rd.cpp:87)
+
+ERROR: Condition "shader.is_null()" is true.
+   at: tonemapper (servers/rendering/renderer_rd/effects/tone_mapper.cpp:209)
+ERROR: Condition "shader.is_null()" is true.
+   at: tonemapper (servers/rendering/renderer_rd/effects/tone_mapper.cpp:209)
+ERROR: Condition "shader.is_null()" is true.
+   at: tonemapper (servers/rendering/renderer_rd/effects/tone_mapper.cpp:209)
+ERROR: Condition "shader.is_null()" is true.
+   at: tonemapper (servers/rendering/renderer_rd/effects/tone_mapper.cpp:209)
+ERROR: Condition "shader.is_null()" is true.
+   at: tonemapper (servers/rendering/renderer_rd/effects/tone_mapper.cpp:209)
+ERROR: Condition "shader.is_null()" is true.
+   at: tonemapper (servers/rendering/renderer_rd/effects/tone_mapper.cpp:209)
+ERROR: Condition "shader.is_null()" is true.
+   at: tonemapper (servers/rendering/renderer_rd/effects/tone_mapper.cpp:209)
+ERROR: Condition "shader.is_null()" is true.
+   at: tonemapper (servers/rendering/renderer_rd/effects/tone_mapper.cpp:209)
+ERROR: Condition "shader.is_null()" is true.
+   at: tonemapper (servers/rendering/renderer_rd/effects/tone_mapper.cpp:209)
+ERROR: Condition "shader.is_null()" is true.
+   at: tonemapper (servers/rendering/renderer_rd/effects/tone_mapper.cpp:209)
+ERROR: Condition "shader.is_null()" is true.
+   at: tonemapper (servers/rendering/renderer_rd/effects/tone_mapper.cpp:209)
+ERROR: Condition "shader.is_null()" is true.
+   at: tonemapper (servers/rendering/renderer_rd/effects/tone_mapper.cpp:209)
+ERROR: Condition "shader.is_null()" is true.
+   at: tonemapper (servers/rendering/renderer_rd/effects/tone_mapper.cpp:209)
+ERROR: Condition "shader.is_null()" is true.
+   at: tonemapper (servers/rendering/renderer_rd/effects/tone_mapper.cpp:209)
+ERROR: Parameter "shader" is null.
+   at: get_shader_parameter_list (servers/rendering/renderer_rd/storage_rd/material_storage.cpp:2307)
+ERROR: Parameter "shader" is null.
+   at: get_shader_parameter_list (servers/rendering/renderer_rd/storage_rd/material_storage.cpp:2307)

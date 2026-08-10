@@ -227,6 +227,10 @@ vec3 tonemap_agx(vec3 color) {
 	return color;
 }
 
+vec3 tonemap_gt7(vec3 color) {
+	return tonemap_aces(color); // placeholder — real GT7 curve goes here later
+}
+
 vec3 linear_to_srgb(vec3 color) {
 	const vec3 a = vec3(0.055f);
 	return mix((vec3(1.0f) + a) * pow(color.rgb, vec3(1.0f / 2.4f)) - a, 12.92f * color.rgb, lessThan(color.rgb, vec3(0.0031308f)));
@@ -242,6 +246,7 @@ vec3 srgb_to_linear(vec3 color) {
 #define TONEMAPPER_FILMIC 2
 #define TONEMAPPER_ACES 3
 #define TONEMAPPER_AGX 4
+#define TONEMAPPER_GT7 5
 
 vec3 apply_tonemapping(vec3 color) { // inputs are LINEAR
 	if (params.tonemapper == TONEMAPPER_LINEAR) {
@@ -258,8 +263,10 @@ vec3 apply_tonemapping(vec3 color) { // inputs are LINEAR
 		return tonemap_filmic(color);
 	} else if (params.tonemapper == TONEMAPPER_ACES) {
 		return tonemap_aces(color);
-	} else { // TONEMAPPER_AGX
+	} else if (params.tonemapper == TONEMAPPER_AGX) {
 		return tonemap_agx(color);
+	} else { // TONEMAPPER_GT7
+		return tonemap_gt7(color);
 	}
 }
 
